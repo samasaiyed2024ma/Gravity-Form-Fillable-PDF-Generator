@@ -1,0 +1,164 @@
+/* ==========================================================================
+   GF Fillable PDF Generator — Admin Styles
+   ========================================================================== */
+
+/* ── Variables ─────────────────────────────────────────────────────────── */
+:root {
+	--gffpdf-primary:     #2271b1;
+	--gffpdf-primary-dk:  #135e96;
+	--gffpdf-success:     #00a32a;
+	--gffpdf-danger:      #d63638;
+	--gffpdf-warn:        #dba617;
+	--gffpdf-border:      #c3c4c7;
+	--gffpdf-bg:          #f6f7f7;
+	--gffpdf-radius:      4px;
+	--gffpdf-shadow:      0 1px 3px rgba(0,0,0,.12);
+}
+
+/* ── Wrap ───────────────────────────────────────────────────────────────── */
+.gffpdf-wrap h1 { margin-bottom: 1rem; }
+
+/* ── Notices ─────────────────────────────────────────────────────────── */
+.gffpdf-notice {
+	padding: .75rem 1rem;
+	border-left: 4px solid var(--gffpdf-primary);
+	background: #fff;
+	margin: 1rem 0;
+	border-radius: var(--gffpdf-radius);
+}
+.gffpdf-notice--success { border-color: var(--gffpdf-success); }
+.gffpdf-notice--error   { border-color: var(--gffpdf-danger); }
+
+/* ── Stats row ───────────────────────────────────────────────────────── */
+.gffpdf-stats-row {
+	display: flex;
+	gap: 1rem;
+	flex-wrap: wrap;
+	margin: 1.5rem 0;
+}
+.gffpdf-stat-card {
+	background: #fff;
+	border: 1px solid var(--gffpdf-border);
+	border-radius: var(--gffpdf-radius);
+	padding: 1.25rem 1.5rem;
+	min-width: 140px;
+	text-align: center;
+	box-shadow: var(--gffpdf-shadow);
+}
+.gffpdf-stat-number {
+	display: block;
+	font-size: 2rem;
+	font-weight: 700;
+	color: var(--gffpdf-primary);
+	line-height: 1;
+}
+.gffpdf-stat-label {
+	display: block;
+	font-size: .8rem;
+	color: #646970;
+	margin-top: .4rem;
+}
+
+/* ── Quick links ─────────────────────────────────────────────────────── */
+.gffpdf-quick-links { margin: 1.5rem 0; }
+.gffpdf-quick-links .button { margin-right: .5rem; }
+
+/* ── Settings container ──────────────────────────────────────────────── */
+.gffpdf-settings-container { max-width: 900px; }
+.gffpdf-settings-panel,
+.gffpdf-logs-panel {
+	background: #fff;
+	border: 1px solid var(--gffpdf-border);
+	border-radius: var(--gffpdf-radius);
+	padding: 1.5rem;
+	margin-bottom: 1.5rem;
+	box-shadow: var(--gffpdf-shadow);
+}
+.gffpdf-settings-panel h2,
+.gffpdf-logs-panel h2 { margin-top: 0; }
+
+/* ── Log viewer ──────────────────────────────────────────────────────── */
+.gffpdf-log-viewer {
+	max-height: 400px;
+	overflow-y: auto;
+	background: #1e1e1e;
+	border-radius: var(--gffpdf-radius);
+	padding: 1rem;
+}
+.gffpdf-log-pre {
+	color: #d4d4d4;
+	font-size: .75rem;
+	line-height: 1.6;
+	margin: 0;
+	white-space: pre-wrap;
+	word-break: break-all;
+}
+
+/* ── Toggle switch ───────────────────────────────────────────────────── */
+.gffpdf-toggle {
+	position: relative;
+	display: inline-block;
+	width: 44px;
+	height: 24px;
+	vertical-align: middle;
+}
+.gffpdf-toggle input { opacity: 0; width: 0; height: 0; }
+.gffpdf-toggle-slider {
+	position: absolute;
+	inset: 0;
+	background: #c3c4c7;
+	border-radius: 24px;
+	cursor: pointer;
+	transition: .2s;
+}
+.gffpdf-toggle-slider::before {
+	content: '';
+	position: absolute;
+	height: 18px;
+	width: 18px;
+	left: 3px;
+	bottom: 3px;
+	background: #fff;
+	border-radius: 50%;
+	transition: .2s;
+}
+.gffpdf-toggle input:checked + .gffpdf-toggle-slider { background: var(--gffpdf-primary); }
+.gffpdf-toggle input:checked + .gffpdf-toggle-slider::before { transform: translateX(20px); }
+
+/* ── Badge ───────────────────────────────────────────────────────────── */
+.gffpdf-badge {
+	display: inline-block;
+	padding: 2px 8px;
+	border-radius: 10px;
+	font-size: .75rem;
+	font-weight: 600;
+}
+.gffpdf-badge--error   { background: #fce8e8; color: var(--gffpdf-danger); }
+.gffpdf-badge--success { background: #e8fce8; color: var(--gffpdf-success); }
+
+/* ── Entry PDF list box ──────────────────────────────────────────────── */
+.gffpdf-entry-box .gffpdf-pdf-list {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+.gffpdf-entry-box .gffpdf-pdf-list li {
+	padding: .5rem 0;
+	border-bottom: 1px solid var(--gffpdf-border);
+}
+.gffpdf-entry-box .gffpdf-pdf-list li:last-child { border-bottom: none; }
+
+/* ── Empty state ─────────────────────────────────────────────────────── */
+.gffpdf-empty-state {
+	text-align: center;
+	padding: 3rem 1rem;
+	color: #646970;
+}
+.gffpdf-empty-state .dashicons {
+	font-size: 3rem;
+	width: 3rem;
+	height: 3rem;
+	display: block;
+	margin: 0 auto .75rem;
+	color: var(--gffpdf-border);
+}

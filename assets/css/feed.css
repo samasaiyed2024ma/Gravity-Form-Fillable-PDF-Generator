@@ -1,0 +1,180 @@
+/* ==========================================================================
+   GF Fillable PDF Generator — Feed Settings Styles
+   ========================================================================== */
+
+#gffpdf-add-feed{
+    background: #1558a0;
+    color: #fff;
+    border-color: #1558a0;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: .875rem;
+    font-weight: 500;
+    cursor: pointer;
+    text-decoration: none;
+    border: 1px solid transparent;
+    transition: all .2s;
+    line-height: 1;
+    float: right;
+    margin-top: 10px;
+}
+
+/* ── Feed table ──────────────────────────────────────────────────────── */
+.gffpdf-feed-table .column-name     { width: 25%; }
+.gffpdf-feed-table .column-template { width: 25%; }
+.gffpdf-feed-table .column-mappings { width: 15%; }
+.gffpdf-feed-table .column-status  { width: 10%; }
+
+.column-name strong{
+    color: #2271b1;
+    text-transform: capitalize;
+}
+
+/* ── Field rows ──────────────────────────────────────────────────────── */
+.gffpdf-field-row {
+	margin-bottom: 1.25rem;
+}
+.gffpdf-field-row label {
+	display: block;
+	font-weight: 600;
+	margin-bottom: .35rem;
+}
+.gffpdf-field-row .description {
+	color: #646970;
+	font-size: .85rem;
+	margin-top: .35rem;
+}
+.gffpdf-field-row--inline {
+	display: flex;
+	align-items: center;
+	gap: .75rem;
+}
+.gffpdf-field-row--inline label { margin-bottom: 0; }
+
+.action-btn a{
+    color: #2271b1;
+}
+
+.action-btn span{
+    color: #979797;
+}
+
+.action-btn{
+    margin-top: 4px;
+    font-size: 13px;
+    cursor: pointer;
+	opacity: 0;
+	visibility: hidden;
+	transform: translateY(2px);
+	transition: all 0.2s ease;
+}
+
+.gffpdf-feed-table tr:hover .action-btn{
+	opacity: 1;
+	visibility: visible;
+	transform: translateY(0);
+}
+
+
+/* ── Upload area ─────────────────────────────────────────────────────── */
+.gffpdf-upload-area {
+	border: 2px dashed #c3c4c7;
+	border-radius: 4px;
+	padding: 1.25rem;
+	background: #f6f7f7;
+}
+.gffpdf-upload-status {
+	display: inline-block;
+	margin-left: .75rem;
+	font-style: italic;
+	color: #646970;
+}
+.gffpdf-upload-status.success { color: #00a32a; font-style: normal; font-weight: 600; }
+.gffpdf-upload-status.error   { color: #d63638; font-style: normal; }
+
+/* ── Mapping actions ─────────────────────────────────────────────────── */
+.gffpdf-mapping-actions { margin-bottom: .75rem; }
+
+/* ── Mapping table ───────────────────────────────────────────────────── */
+.gffpdf-mapping-table th { background: #f6f7f7; font-weight: 600; }
+.gffpdf-mapping-table td,
+.gffpdf-mapping-table th { padding: .5rem .75rem; }
+.gffpdf-mapping-table select { width: 100%; }
+.gffpdf-mapping-table .pdf-field-name { font-family: monospace; font-size: .85rem; }
+
+/* ── Modal ───────────────────────────────────────────────────────────── */
+.gffpdf-modal {
+	position: fixed;
+	inset: 0;
+	z-index: 100000;
+	display: flex;
+	align-items: flex-start;
+	justify-content: center;
+	padding: 2rem 1rem;
+	overflow-y: auto;
+}
+.gffpdf-modal-backdrop {
+	position: fixed;
+	inset: 0;
+	background: rgba(0,0,0,.6);
+}
+.gffpdf-modal-dialog {
+	position: relative;
+	background: #fff;
+	border-radius: 6px;
+	box-shadow: 0 8px 32px rgba(0,0,0,.25);
+	width: 100%;
+	max-width: 760px;
+	display: flex;
+	flex-direction: column;
+}
+.gffpdf-modal-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 1rem 1.25rem;
+	border-bottom: 1px solid #c3c4c7;
+}
+.gffpdf-modal-header h2 { margin: 0; font-size: 1.1rem; }
+.gffpdf-modal-close {
+	background: none;
+	border: none;
+	font-size: 1.5rem;
+	line-height: 1;
+	cursor: pointer;
+	color: #646970;
+	padding: 0 .25rem;
+}
+.gffpdf-modal-close:hover { color: #d63638; }
+.gffpdf-modal-body {
+	padding: 1.25rem;
+	overflow-y: auto;
+	max-height: calc(100vh - 200px);
+}
+.gffpdf-modal-footer {
+	padding: 1rem 1.25rem;
+	border-top: 1px solid #c3c4c7;
+	display: flex;
+	gap: .5rem;
+	justify-content: flex-end;
+}
+
+/* ── Spinner ─────────────────────────────────────────────────────────── */
+.gffpdf-spinner {
+	display: inline-block;
+	width: 16px;
+	height: 16px;
+	border: 2px solid #c3c4c7;
+	border-top-color: #2271b1;
+	border-radius: 50%;
+	animation: gffpdf-spin .7s linear infinite;
+	vertical-align: middle;
+	margin-left: .5rem;
+}
+@keyframes gffpdf-spin { to { transform: rotate(360deg); } }
+
+/* required marker */
+.required { color: #d63638; }
