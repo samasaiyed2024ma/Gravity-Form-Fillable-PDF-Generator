@@ -77,6 +77,11 @@
 .gffpdf-settings-panel h2,
 .gffpdf-logs-panel h2 { margin-top: 0; }
 
+#gffpdf-save-settings{
+	background-color: #1558a0 !important;
+	color: #fff;
+}
+
 /* ── Log viewer ──────────────────────────────────────────────────────── */
 .gffpdf-log-viewer {
 	max-height: 400px;

@@ -49,7 +49,7 @@ class GFFPDF_PDF_Generator {
 		}
 
 		// Build output PDF: PNG backgrounds + overlaid field values
-		$result = $this->build_pdf( $page_images, $field_values, $coord_map );
+		$result = $this->build_pdf( $page_images, $field_values, $coord_map, $options );
 
 		// Clean up temp PNG files
 		foreach ( $page_images as $img ) {
@@ -133,7 +133,7 @@ class GFFPDF_PDF_Generator {
 	 * Step 2: build output PDF with PNG backgrounds + field overlays
 	 * -------------------------------------------------------------------- */
 
-	private function build_pdf( array $page_images, array $values, array $coord_map ) {
+	private function build_pdf( array $page_images, array $values, array $coord_map, array $options = []) {
 		try {
 			$pdf = new TCPDF( 'P', 'mm', 'LETTER', true, 'UTF-8', false );
 			$pdf->setPrintHeader( false );
@@ -161,7 +161,7 @@ class GFFPDF_PDF_Generator {
 					$row_page = (int)( is_object( $row ) ? $row->page_number : $row['page_number'] );
 					if ( $row_page !== $page_num ) continue;
 
-					$this->draw_field( $pdf, $row, (string) $field_value );
+					$this->draw_field( $pdf, $row, (string) $field_value, $options );
 				}
 			}
 
@@ -189,7 +189,7 @@ class GFFPDF_PDF_Generator {
 	 * We convert field coords from PDF points → mm using 0.352778 pt/mm.
 	 * -------------------------------------------------------------------- */
 
-	private function draw_field( $pdf, $row, string $value ): void {
+	private function draw_field( $pdf, $row, string $value, array $options = [] ): void {
 		$pt = 0.352778; // 1 PDF point → mm
 
 		$x1          = (float)( is_object( $row ) ? $row->rect_x1     : $row['rect_x1'] );
@@ -214,15 +214,16 @@ class GFFPDF_PDF_Generator {
 			$v = strtolower( $value );
 			if ( $v === 'yes' || $v === '1' || $v === 'on' || $v === 'true' ) {
 				$pdf->SetFont( 'zapfdingbats', '', $font_size_pt );
-				$pdf->SetTextColor( 0, 0, 0 );
+				$pdf->SetTextColor( 0, 0, 0 ); 
 				$pdf->SetXY( $left, $tcpdf_y );
 				$pdf->Cell( $field_w, $field_h, '4', 0, 0, 'C' );
 			}
 			return;
 		}
 
-		$pdf->SetFont( 'helvetica', '', $font_size_pt );
-		$pdf->SetTextColor( 0, 0, 0 );
+		$font_options = $this->resolve_font_options( $options, $font_size_pt );
+		$pdf->SetFont( $font_options['family'], '', $font_options['size'] );
+		$pdf->SetTextColor( $font_options['r'], $font_options['g'], $font_options['b'] );
 
 		$text_h_mm       = $font_size_pt * $pt;
 		$tcpdf_y_centred = $tcpdf_y + ( $field_h / 2 ) - ( $text_h_mm / 2 );
@@ -274,5 +275,41 @@ class GFFPDF_PDF_Generator {
 	public static function normalise_checkbox( $gf_value ): string {
 		return ( empty( $gf_value ) || $gf_value === '0' || strtolower( (string) $gf_value ) === 'off' )
 			? 'Off' : 'Yes';
+	}
+
+	private function resolve_font_options(array $options, float $auto_size): array{
+		$global = GFFPDF_Settings::get_settings();
+
+		// Font family: feed->global->'helvetica
+	    $family = $options['font_family'] ?? $global['default_font_family'] ?? 'helvetica';
+
+		// Font size: feed->global->auto-calculated from field height
+		$size = null;
+		if ( ! empty( $options['font_size'] ) && is_numeric( $options['font_size'] ) ) {
+			$size = (float) $options['font_size'];
+		} elseif ( ! empty( $global['default_font_size'] ) && is_numeric( $global['default_font_size'] ) ) {
+			$size = (float) $global['default_font_size'];
+		}
+		$size = $size ?? $auto_size;
+		$size = max( 6.0, min( 72.0, $size ) );
+
+		// Font color: feed → global → '#000000'
+		$hex = '#000000';
+		if ( ! empty( $options['font_color'] ) ) {
+			$hex = $options['font_color'];
+		} elseif ( ! empty( $global['default_font_color'] ) ) {
+			$hex = $global['default_font_color'];
+		}
+
+		// Convert hex to RGB
+		$hex = ltrim( $hex, '#' );
+		if ( strlen( $hex ) === 3 ) {
+			$hex = $hex[0] . $hex[0] . $hex[1] . $hex[1] . $hex[2] . $hex[2];
+		}
+		$r = hexdec( substr( $hex, 0, 2 ) );
+		$g = hexdec( substr( $hex, 2, 2 ) );
+		$b = hexdec( substr( $hex, 4, 2 ) );
+
+		return compact( 'family', 'size', 'r', 'g', 'b' );
 	}
 }

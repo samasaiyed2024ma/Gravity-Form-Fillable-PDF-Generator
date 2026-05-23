@@ -41,6 +41,11 @@
         // Remove data then deactivate
         $('#gffpdf-deactivate-remove').on('click', function(e){
             e.preventDefault();
+            
+            if ( ! confirm('Are you sure you want to remove all plugin data? This cannot be undone.') ) {
+                return;
+            }
+
             $.post(gffpdf_deactivate.ajax_url, {
                 action: 'gffpdf_deactivate_cleanup',
                 nonce: gffpdf_deactivate.nonce
