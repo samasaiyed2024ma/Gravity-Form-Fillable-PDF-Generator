@@ -23,15 +23,155 @@ class GFFPDF_Admin_Menu {
 	 * -------------------------------------------------------------------- */
 
 	public function register_menus(): void {
-		// Already accessible via GF Settings; add a standalone top-level page too
+		// Hidden overview page — accessed via direct URL or GF settings
 		add_submenu_page(
-			null, // Hidden — accessed via direct URL or GF settings
+			null,
 			__( 'GF Fillable PDF Generator', 'gf-fillable-pdf' ),
 			__( 'Fillable PDF', 'gf-fillable-pdf' ),
 			GFFPDF_Security::CAPABILITY,
 			'gffpdf-generator',
 			[ $this, 'render_overview_page' ]
 		);
+
+		// Font manager is now embedded inline on the global settings page
+		// and on the feed settings page. Register a legacy redirect page
+		// so any bookmarked URLs still work.
+		add_submenu_page(
+			null, // hidden
+			__( 'Manage Fonts - GF PDF', 'gf-fillable-pdf' ),
+			__( 'PDF Fonts', 'gf-fillable-pdf' ),
+			GFFPDF_Security::get_capability(),
+			'gffpdf-fonts',
+			[ $this, 'render_font_manager_redirect' ]
+		);
+	}
+
+	/**
+	 * Redirect legacy /wp-admin/admin.php?page=gffpdf-fonts URLs to the
+	 * global settings page where fonts are now managed inline.
+	 */
+	public function render_font_manager_redirect(): void {
+		wp_safe_redirect( admin_url( 'admin.php?page=gf_settings&subview=gffpdf' ) );
+		exit;
+	}
+
+	public function render_font_manager_page(): void {
+		if ( ! GFFPDF_Security::current_user_can() ) {
+			wp_die( esc_html__( 'You do not have permission to access this page.', 'gf-fillable-pdf' ), 403 );
+		}
+
+		wp_enqueue_style(
+			'gffpdf-admin',
+			GFFPDF_URL . 'assets/css/admin.css',
+			[],
+			GFFPDF_VERSION,
+			true
+		);
+
+		wp_enqueue_script(
+			'gff-admin',
+			GFFPDF_URL . 'assets/js/admin.js',
+			[ 'jquery' ],
+			GFFPDF_VERSION,
+			true
+		);
+
+		wp_localize_script(
+			'gffpdf-admin', 'GFFPDF_Admin', [
+				'ajax_url' => admin_url('admin-ajax.php'),
+				'nonce' => GFFPDF_Security::create_nonce(),
+			] 
+		);
+
+		$custom_fonts = GFFPDF_Font_Manager::get_custom_fonts();
+		$builtin_fonts = GFFPDF_Font_Manager::get_builtin_fonts();
+
+		echo '<div class="wrap gffpdf-wrap">';
+		echo '<h1>' . esc_html__('Manage Fonts', 'gf-fillable-pdf') . '</h1>';
+		echo '<p>' . esc_html__( 'Upload custom fonts (.ttf or .otf) for use in PDF generation. Built-in fonts are always available.', 'gf-fillable-pdf' ) . '</p>';
+
+		// Upload form
+		echo '<div class="gffpdf-settings-panel" style="max-width:700px;">';
+		echo '<h2>' . esc_html__( 'Upload Custom Font', 'gf-fillable-pdf' ) . '</h2>';
+		echo '<table class="form-table"><tbody>';
+		echo '<tr><th><label for="gffpdf-font-file">' . esc_html__( 'Font File (.ttf / .otf)', 'gf-fillable-pdf' ) . '</label></th>';
+		echo '<td><input type="file" id="gffpdf-font-file" accept=".ttf,.otf"></td></tr>';
+		echo '<tr><th><label for="gffpdf-font-label">' . esc_html__( 'Display Name', 'gf-fillable-pdf' ) . '</label></th>';
+		echo '<td><input type="text" id="gffpdf-font-label" class="regular-text" placeholder="' . esc_attr__( 'e.g. My Custom Font', 'gf-fillable-pdf' ) . '"></td></tr>';
+		echo '</tbody></table>';
+		echo '<p><button type="button" id="gffpdf-font-upload-btn" class="button button-primary">' . esc_html__( 'Upload Font', 'gf-fillable-pdf' ) . '</button> <span id="gffpdf-font-upload-status"></span></p>';
+		echo '</div>';
+
+		// Custom fonts list
+		echo '<div class="gffpdf-settings-panel" style="max-width:700px;margin-top:20px;">';
+		echo '<h2>' . esc_html__( 'Uploaded Custom Fonts', 'gf-fillable-pdf' ) . '</h2>';
+		if ( empty( $custom_fonts ) ) {
+			echo '<p>' . esc_html__( 'No custom fonts uploaded yet.', 'gf-fillable-pdf' ) . '</p>';
+		} else {
+			echo '<table class="widefat"><thead><tr><th>' . esc_html__( 'Family Key', 'gf-fillable-pdf' ) . '</th><th>' . esc_html__( 'Display Name', 'gf-fillable-pdf' ) . '</th><th>' . esc_html__( 'Action', 'gf-fillable-pdf' ) . '</th></tr></thead><tbody id="gffpdf-custom-fonts-list">';
+			foreach ( $custom_fonts as $family => $label ) {
+				echo '<tr id="gffpdf-font-row-' . esc_attr( $family ) . '">';
+				echo '<td><code>' . esc_html( $family ) . '</code></td>';
+				echo '<td>' . esc_html( $label ) . '</td>';
+				echo '<td><button type="button" class="button button-small gffpdf-delete-font" data-family="' . esc_attr( $family ) . '">' . esc_html__( 'Delete', 'gf-fillable-pdf' ) . '</button></td>';
+				echo '</tr>';
+			}
+			echo '</tbody></table>';
+		}
+		echo '</div>';
+ 
+		// Built-in fonts reference
+		echo '<div class="gffpdf-settings-panel" style="max-width:700px;margin-top:20px;">';
+		echo '<h2>' . esc_html__( 'Built-in Fonts', 'gf-fillable-pdf' ) . '</h2>';
+		echo '<table class="widefat"><thead><tr><th>' . esc_html__( 'Family Key', 'gf-fillable-pdf' ) . '</th><th>' . esc_html__( 'Display Name', 'gf-fillable-pdf' ) . '</th></tr></thead><tbody>';
+		foreach ( $builtin_fonts as $fam => $lbl ) {
+			echo '<tr><td><code>' . esc_html( $fam ) . '</code></td><td>' . esc_html( $lbl ) . '</td></tr>';
+		}
+		echo '</tbody></table>';
+		echo '</div>';
+
+				// Inline JS for font manager page
+		?>
+		<script type="text/javascript">
+		(function($){
+			var nonce = <?php echo wp_json_encode( GFFPDF_Security::create_nonce() ); ?>;
+			var ajaxUrl = <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>;
+ 
+			$('#gffpdf-font-upload-btn').on('click', function(){
+				var file  = $('#gffpdf-font-file')[0].files[0];
+				var label = $('#gffpdf-font-label').val();
+				var $status = $('#gffpdf-font-upload-status');
+				if (!file) { $status.text('<?php echo esc_js( __( 'Please select a font file.', 'gf-fillable-pdf' ) ); ?>'); return; }
+				$status.text('<?php echo esc_js( __( 'Uploading…', 'gf-fillable-pdf' ) ); ?>');
+				var fd = new FormData();
+				fd.append('action',    'gffpdf_upload_font');
+				fd.append('nonce',     nonce);
+				fd.append('font_file', file);
+				fd.append('font_label', label);
+				$.ajax({ url: ajaxUrl, type: 'POST', data: fd, processData: false, contentType: false })
+				.done(function(res){
+					if (res.success) {
+						$status.text(res.data.message);
+						setTimeout(function(){ location.reload(); }, 800);
+					} else {
+						$status.text(res.data.message || '<?php echo esc_js( __( 'Upload failed.', 'gf-fillable-pdf' ) ); ?>');
+					}
+				});
+			});
+ 
+			$(document).on('click', '.gffpdf-delete-font', function(){
+				if (!confirm('<?php echo esc_js( __( 'Delete this font?', 'gf-fillable-pdf' ) ); ?>')) return;
+				var family = $(this).data('family');
+				$.post(ajaxUrl, { action: 'gffpdf_delete_font', nonce: nonce, family: family })
+				.done(function(res){
+					if (res.success) { $('#gffpdf-font-row-' + family).remove(); }
+				});
+			});
+		}(jQuery));
+		</script>
+		<?php
+		echo '</div>';
+ 
 	}
 
 	public function render_overview_page(): void {

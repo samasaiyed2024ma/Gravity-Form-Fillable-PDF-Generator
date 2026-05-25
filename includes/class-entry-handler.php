@@ -53,6 +53,17 @@ class GFFPDF_Entry_Handler {
 			return null;
 		}
 
+		// Conditional logic check
+		if( !$this->passes_conditional_logic( $settings, $entry, $form )){
+			GFFPDF_Logger::info( 
+				'Feed skipped due to conditional logic', 
+				[
+					'feed_id' => $feed_id,
+					'entry_id' => $entry['id'],
+				]);
+				return null;
+		}
+
 		// Filter out any unmapped entries (value is empty string or "0")
 		// so we don't write blank values into the PDF for intentionally skipped fields.
 		$mappings = array_filter( $mappings, function( $gf_field_id ) {
@@ -96,8 +107,12 @@ class GFFPDF_Entry_Handler {
 		// Store record in DB
 		$record_id = self::save_pdf_record( $entry['id'], $form['id'], $feed_id, $path );
 
-		// Optionally attach to email notifications
-		if ( ! empty( $settings['attach_to_email'] ) ) {
+		// Attach to selected notifications (oe all id legacy attach_to_email is set)
+		$selected_notifications = $settings['notification_ids'] ?? [];
+		if( ! empty( $selected_notifications ) && is_array( $selected_notifications ) ){
+			$this->attach_to_selected_notifications( $path, $form, $entry, $selected_notifications );
+		}elseif ( ! empty( $settings['attach_to_email'] ) ){
+			// Attach to all notifications
 			$this->attach_to_notifications( $path, $form, $entry );
 		}
 
@@ -109,6 +124,63 @@ class GFFPDF_Entry_Handler {
 
 		return $record_id;
 	}
+
+	/* -----------------------------------------------------------------------
+	 * Conditional logic
+	 * -------------------------------------------------------------------- */
+ 
+	/**
+	 * Returns true if the feed's conditional logic passes (or is disabled).
+	 */
+	private function passes_conditional_logic(array $settings, array $entry, array $form): bool{
+		$cl = $settings['conditional_logic'] ?? [];
+
+		if( empty($cl['enabled']) || empty( $cl['rules'] ) ){
+			return true; // No conditional logic - always run
+		}
+
+		$logic_type = $cl['logic_type'] ?? 'all'; // 'all' = AND, 'any' = OR
+		$action = $cl['action'] ?? 'show'; // 'show' = enable PDF if match
+		$rules = $cl['rules'];
+
+		$results = [];
+		foreach($rules as $rule){
+			$field_id = (string) ( $rule['field_id'] ?? '' );
+			$operator = $rule['operator'] ?? 'is';
+			$expected = (string) ( $rule['vaue'] ?? '' );
+			$actual = (string) rgar($entry, $field_id);
+
+			$results[] = $this->evaluate_rule($actual, $operator, $expected);
+		}
+
+		$matched = ( $logic_type === 'all' ) 
+			? ! in_array(false, $results, true)
+			: in_array(true, $results, true);
+			
+		return ($action === 'show') ? $matched : ! $matched;
+	}
+
+	private function evaluate_rule(string $actual, string $operator, string $expected): bool{
+		switch( $operator ){
+			case 'is':
+				return $actual === $expected;
+			case 'isnot':
+				return $actual !== $expected;
+			case 'greater_than':
+				return is_numeric( $actual ) && is_numeric( $expected ) && (float) $actual > (float) $expected;
+			case 'less_than':
+				return is_numeric( $actual ) && is_numeric( $expected ) && (float) $actual < (float) $expected;
+			case 'contains':
+				return str_contains( $actual, $expected );
+			case 'starts_with':
+				return str_starts_with( $actual, $expected );
+			case 'ends_with':
+				return str_ends_with( $actual, $expected );
+			default:
+				return false;
+		}
+	}
+
 
 	/* -----------------------------------------------------------------------
 	 * Build field values from GF entry
@@ -187,6 +259,23 @@ class GFFPDF_Entry_Handler {
 			$notification['attachments'][] = $pdf_path;
 			return $notification;
 		}, 10, 3 );
+	}
+
+	/**
+	 * Attach PDF only to specific notificion IDs.
+	 */
+	private function attach_to_selected_notifications(string $pdf_path, array $form, array $entry, array $notification_ids): void{
+		add_filter('gform_notification', function($notification, $form_obj, $entry_obj) use ($pdf_path, $form, $notification_ids){
+			if( $form_obj['id'] !== $form['id'] ) return $notification;
+			if( !in_array( $notification['id'] ?? '', $notification, true ) ) return $notification;
+
+			if( !isset( $notification['attachments'] ) || ! is_array( $notification['attachments'] ) ){
+				$notification['attachments'] = [];
+			}
+
+			$notification['attachments'][] = $pdf_path;
+			return $notification;
+		}, 10, 3);
 	}
 
 	/* -----------------------------------------------------------------------

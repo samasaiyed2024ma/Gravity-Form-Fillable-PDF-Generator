@@ -21,7 +21,7 @@
 						<td>
 							<select id="gffpdf-font-family" name="default_font_family">
 								<?php
-								$families = [ 'helvetica' => 'Helvetica', 'courier' => 'Courier', 'times' => 'Times New Roman', 'dejavusans' => 'DejaVu Sans (Unicode)' ];
+								$families = GFFPDF_Font_Manager::get_all_fonts();
 								foreach ( $families as $val => $label ) {
 									printf(
 										'<option value="%s"%s>%s</option>',
@@ -138,6 +138,19 @@
 				</button>
 			</p>
 		</div><!-- .gffpdf-settings-panel -->
+
+		<!-- ===================== MANAGE FONTS (inline) ================== -->
+		<div class="gffpdf-settings-panel" style="margin-top:24px;">
+			<div class="gffpdf-section-toggle-header" id="gffpdf-global-fonts-toggle" style="cursor:pointer;display:flex;align-items:center;gap:8px;margin-bottom:0;">
+				<span class="gffpdf-toggle-arrow">▶</span>
+				<h2 style="margin:0;"><?php esc_html_e( '🔤 Manage Fonts', 'gf-fillable-pdf' ); ?></h2>
+				<span style="font-size:13px;color:#646970;font-weight:400;"><?php esc_html_e( '(click to expand)', 'gf-fillable-pdf' ); ?></span>
+			</div>
+			<div id="gffpdf-global-fonts-body" style="display:none;margin-top:16px;">
+				<?php include GFFPDF_PATH . 'templates/settings/manage-fonts.php'; ?>
+			</div>
+		</div>
+
 
 		<!-- ===================== LOGS PANEL ============================ -->
 		<?php if ( $settings['enable_logs'] ) : ?>

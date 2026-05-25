@@ -23,6 +23,10 @@
 }
 
 /* ── Feed table ──────────────────────────────────────────────────────── */
+.gffpdf-feed-table{
+	border-radius: 4px;
+}
+
 .gffpdf-feed-table .column-name     { width: 25%; }
 .gffpdf-feed-table .column-template { width: 25%; }
 .gffpdf-feed-table .column-mappings { width: 15%; }
@@ -178,3 +182,108 @@
 
 /* required marker */
 .required { color: #d63638; }
+/* =========================================================================
+   Inline feed editor (replaces modal)
+   ========================================================================= */
+
+/* Fade the feed list while editor is open */
+#gffpdf-feed-list-wrap {
+	transition: opacity 0.2s;
+}
+
+/* Editor header bar */
+.gffpdf-editor-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 14px 20px;
+	border-bottom: 1px solid #c3c4c7;
+	background: #f6f7f7;
+	border-radius: 6px 6px 0 0;
+}
+
+.gffpdf-editor-header h2 {
+	margin: 0;
+	font-size: 1.1rem;
+}
+
+.gffpdf-editor-header .button{
+	background-color: #366e92;
+	color: #fff;
+	transition: 0.6s ease;
+}
+
+.gffpdf-editor-header .button:hover{
+	border: 1px solid #366e92;
+	color: #366e92;
+}
+
+/* Editor footer */
+.gffpdf-editor-footer {
+	padding: 20px 24px;
+	border: 1px solid #c3c4c7;
+	display: flex;
+	gap: 8px;
+	background: #fff;;
+	margin-top: 20px;
+}
+
+.gffpdf-editor-footer .button{
+	background-color: #366e92;
+	color: #fff;
+	transition: 0.6s ease;
+}
+
+.gffpdf-editor-footer .button:hover{
+	border: 1px solid #366e92;
+	color: #366e92;
+}
+
+.gffpdf-section{
+	background-color: #fff;
+	border: 1px solid #c3c4c7;
+	padding: 20px 24px;
+	margin-top: 20px;
+	border-radius: 4px;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, .08);
+}
+
+/* Collapsible section toggle */
+.gffpdf-section-toggle-header {
+	user-select: none;
+}
+.gffpdf-section-toggle-header:hover h2,
+.gffpdf-section-toggle-header:hover h3 {
+	color: #2271b1;
+}
+.gffpdf-toggle-arrow {
+	font-size: 11px;
+	color: #2271b1;
+	min-width: 12px;
+}
+
+/* Fonts partial panels inside editor */
+.gffpdf-fonts-partial .gffpdf-settings-panel {
+	border: 1px solid #e0e0e0;
+	border-radius: 4px;
+	padding: 16px;
+	background: #fafafa;
+}
+
+/* Remove old modal rules that are no longer needed */
+.gffpdf-modal,
+.gffpdf-modal-backdrop,
+.gffpdf-modal-dialog,
+.gffpdf-modal-header,
+.gffpdf-modal-body,
+.gffpdf-modal-footer,
+.gffpdf-modal-close {
+	display: none !important;
+}
+
+.gffpdf-table-scroll-container{
+	max-height: 600px; 
+	overflow-y: auto; 
+	border: 1px solid #ccc; 
+	margin-top: 15px;
+}

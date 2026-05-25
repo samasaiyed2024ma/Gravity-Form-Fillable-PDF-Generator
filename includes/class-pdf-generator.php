@@ -221,6 +221,11 @@ class GFFPDF_PDF_Generator {
 			return;
 		}
 
+		// Reverse text if enabled
+		if ( ! empty( $options['reverse_text'] ) ) {
+			$value = $this->reverse_text( $value );
+		}
+
 		$font_options = $this->resolve_font_options( $options, $font_size_pt );
 		$pdf->SetFont( $font_options['family'], '', $font_options['size'] );
 		$pdf->SetTextColor( $font_options['r'], $font_options['g'], $font_options['b'] );
@@ -232,10 +237,24 @@ class GFFPDF_PDF_Generator {
 		$pdf->Cell( $field_w - 2, $text_h_mm, $value, 0, 0, 'L', false, '', 1 );
 	}
 
+	/**
+	 * Reverse text character by character (RTL / mirrored text).
+	 */
+	private function reverse_text( string $text ): string {
+		if ( function_exists( 'mb_strlen' ) ) {
+			$len    = mb_strlen( $text, 'UTF-8' );
+			$result = '';
+			for ( $i = $len - 1; $i >= 0; $i-- ) {
+				$result .= mb_substr( $text, $i, 1, 'UTF-8' );
+			}
+			return $result;
+		}
+		return strrev( $text );
+	}
+
 	/* -----------------------------------------------------------------------
 	 * Ghostscript binary detection
 	 * -------------------------------------------------------------------- */
-
 	private function find_ghostscript(): ?string {
 		if ( self::$gs_bin !== null ) {
 			return self::$gs_bin ?: null;
@@ -279,10 +298,24 @@ class GFFPDF_PDF_Generator {
 
 	private function resolve_font_options(array $options, float $auto_size): array{
 		$global = GFFPDF_Settings::get_settings();
-
-		// Font family: feed->global->'helvetica
-	    $family = $options['font_family'] ?? $global['default_font_family'] ?? 'helvetica';
-
+ 
+		// Font family: feed -> global -> 'helvetica'
+		$family = '';
+		if ( ! empty( $options['font_family'] ) ) {
+			$family = $options['font_family'];
+		} elseif ( ! empty( $global['default_font_family'] ) ) {
+			$family = $global['default_font_family'];
+		}
+		$family = $family ?: 'helvetica';
+ 
+		// Validate font against known fonts (builtin + custom)
+		if ( class_exists( 'GFFPDF_Font_Manager' ) ) {
+			$all_fonts = GFFPDF_Font_Manager::get_all_fonts();
+			if ( ! isset( $all_fonts[ $family ] ) ) {
+				$family = 'helvetica';
+			}
+		}
+ 
 		// Font size: feed->global->auto-calculated from field height
 		$size = null;
 		if ( ! empty( $options['font_size'] ) && is_numeric( $options['font_size'] ) ) {
@@ -292,7 +325,7 @@ class GFFPDF_PDF_Generator {
 		}
 		$size = $size ?? $auto_size;
 		$size = max( 6.0, min( 72.0, $size ) );
-
+ 
 		// Font color: feed → global → '#000000'
 		$hex = '#000000';
 		if ( ! empty( $options['font_color'] ) ) {
@@ -300,7 +333,7 @@ class GFFPDF_PDF_Generator {
 		} elseif ( ! empty( $global['default_font_color'] ) ) {
 			$hex = $global['default_font_color'];
 		}
-
+ 
 		// Convert hex to RGB
 		$hex = ltrim( $hex, '#' );
 		if ( strlen( $hex ) === 3 ) {
@@ -309,7 +342,7 @@ class GFFPDF_PDF_Generator {
 		$r = hexdec( substr( $hex, 0, 2 ) );
 		$g = hexdec( substr( $hex, 2, 2 ) );
 		$b = hexdec( substr( $hex, 4, 2 ) );
-
+ 
 		return compact( 'family', 'size', 'r', 'g', 'b' );
 	}
 }

@@ -73,6 +73,7 @@ function gffpdf_init(){
 	require_once GFFPDF_PATH . 'includes/class-logger.php';
 	require_once GFFPDF_PATH . 'includes/class-security.php';
 	require_once GFFPDF_PATH . 'includes/class-file-handler.php';
+	require_once GFFPDF_PATH . 'includes/class-font-manager.php';
 	require_once GFFPDF_PATH . 'includes/class-pdf-field-extractor.php';
 	require_once GFFPDF_PATH . 'includes/class-pdf-generator.php';
 	require_once GFFPDF_PATH . 'includes/class-template-handler.php';

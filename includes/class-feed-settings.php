@@ -20,6 +20,12 @@ class GFFPDF_Feed_Settings {
 		add_action( 'wp_ajax_gffpdf_upload_pdf',     [ $this, 'ajax_upload_pdf' ] );
 		add_action( 'wp_ajax_gffpdf_get_feed',       [ $this, 'ajax_get_feed' ] );
 		add_action( 'wp_ajax_gffpdf_auto_map',       [ $this, 'ajax_auto_map' ] );
+		add_action( 'wp_ajax_gffpdf_upload_font',    [ $this, 'ajax_upload_font' ] );
+		add_action( 'wp_ajax_gffpdf_delete_font',    [ $this, 'ajax_delete_font' ] );
+		add_action( 'wp_ajax_gffpdf_get_notifications', [ $this, 'ajax_get_notifications' ] );
+
+		// Shortocde: [gffpdf feed_id="1" entry_id="{entry_id}"]
+		add_shortcode( 'gffpdf', [ $this, 'shortcode_pdf_link' ] );
 	}
 
 	/* -----------------------------------------------------------------------
@@ -43,13 +49,20 @@ class GFFPDF_Feed_Settings {
 		$form    = GFAPI::get_form( $form_id );
 		$feeds   = self::get_feeds_by_form( $form_id );
 		$fields  = $this->get_gf_fields( $form );
+		$notifications = ! empty( $form['notifications'] ) ? array_map( function( $id, $n ){
+			return [ 
+				'id' => $id,  
+				'name' => $n['name'] ?? $id,
+			];
+		}, array_keys( $form['notifications'] ), $form['notifications'] ) : [];
+		$all_fonts = GFFPDF_Font_Manager::get_all_fonts();
 
 		wp_enqueue_media();
 		$this->enqueue_feed_assets( $form_id );
 
-         GFFormSettings::page_header();
+        GFFormSettings::page_header();
 		include GFFPDF_PATH . 'templates/feeds/feed-settings.php';
-         GFFormSettings::page_footer();
+        GFFormSettings::page_footer();
 	}
 
 	private function enqueue_feed_assets( int $form_id ): void {
@@ -63,10 +76,12 @@ class GFFPDF_Feed_Settings {
 		wp_enqueue_script(
 			'gffpdf-feed',
 			GFFPDF_URL . 'assets/js/feed.js',
-			[ 'jquery' ],
+			[ 'jquery', 'wp-color-picker' ],
 			GFFPDF_VERSION,
 			true
 		);
+
+		wp_enqueue_style( 'wp-color-picker' );
 
 		wp_enqueue_script(
 			'gffpdf-mappings',
@@ -80,15 +95,21 @@ class GFFPDF_Feed_Settings {
 			'ajax_url' => admin_url( 'admin-ajax.php' ),
 			'nonce'    => GFFPDF_Security::create_nonce(),
 			'form_id'  => $form_id,
+			'fonts'    => GFFPDF_Font_Manager::get_all_fonts(),
 			'strings'  => [
 				'confirm_delete'    => __( 'Are you sure you want to delete this feed?', 'gf-fillable-pdf' ),
 				'confirm_duplicate' => __( 'Duplicate this feed?', 'gf-fillable-pdf' ),
-				'saving'            => __( 'Saving…', 'gf-fillable-pdf' ),
+				'saving'            => __( 'Saving...', 'gf-fillable-pdf' ),
 				'saved'             => __( 'Feed saved.', 'gf-fillable-pdf' ),
 				'error'             => __( 'An error occurred. Please try again.', 'gf-fillable-pdf' ),
-				'uploading'         => __( 'Uploading PDF…', 'gf-fillable-pdf' ),
+				'uploading'         => __( 'Uploading PDF...', 'gf-fillable-pdf' ),
 				'upload_success'    => __( 'PDF uploaded successfully.', 'gf-fillable-pdf' ),
 				'no_fields'         => __( 'No fillable fields found in this PDF.', 'gf-fillable-pdf' ),
+				'uploading_font'    => __( 'Uploading font...',  'gf-fillable-pdf'),
+				'font_uploaded'     => __( 'Font uploaded.', 'gf-fillable-pdf' ),
+				'confirm_del_font'  => __( 'Delete this font', 'gf-fillable-pdf' ),
+				'add_rule' 			=> __( '+ Add Rule', 'gf-fillable-pdf' ),
+				'remove_rule'       => __( 'Remove', 'gf-fillable-pdf' ), 
 			],
 		] );
 	}
@@ -111,10 +132,31 @@ class GFFPDF_Feed_Settings {
 			}
 		}
 
+		// Conditional logic posted as JSON
+		$raw_cl = $_POST['conditional_logic_json'] ?? '';
+		$conditional_logic = [];
+		if( is_string( $raw_cl ) && $raw_cl !== '' ){
+			$decode_cl = json_decode( wp_unslash( $raw_cl ), true );
+			if( is_array( $decode_cl ) ){
+				$conditional_logic = $decode_cl;
+			}
+		}
+
+		// Notification IDs posted as JSON
+		$raw_notifications = $_POST['notification_ids_json'] ?? '';
+		$notification_ids = [];
+		if( is_string( $raw_notifications ) && $raw_notifications !== '' ){
+			$decoded_n = json_decode( wp_unslash( $raw_notifications ), true );
+			if( is_array( $decoded_n ) ){
+				$notification_ids = $decoded_n;
+			}
+		}
+
 		// Build feed_settings array, ensuring save_pdfs defaults to true
-		// (absent from the modal form means "enabled", not "disabled").
 		$raw_settings              = $_POST['feed_settings'] ?? [];
 		$raw_settings['save_pdfs'] = $raw_settings['save_pdfs'] ?? 1;
+		$raw_settings['conditional_logic'] = $conditional_logic;
+		$raw_settings['notification_ids'] = $notification_ids;
 
 		$data = [
 			'form_id'       => absint( $_POST['form_id'] ?? 0 ),
@@ -257,6 +299,126 @@ class GFFPDF_Feed_Settings {
 
 		wp_send_json_success( $mappings );
 	}
+
+	/* -----------------------------------------------------------------------
+	 * Font management AJAX
+	 * -------------------------------------------------------------------- */
+	public function ajax_upload_font(): void{
+		GFFPDF_Security::check_ajax();
+
+		if( empty( $_FILES['font_file'] ) ){
+			wp_send_json_error( ['message' => __( 'No font file uploaded', 'gf-fillable-pdf' )] );
+		}
+
+		$label = sanitize_text_field( wp_unslash( $_POST['font_label'] ?? '' ) );
+		$result = GFFPDF_Font_Manager::upload_font( $_FILES['font_file'], $label );
+
+		if( is_wp_error($result) ){
+			wp_send_json_error( ['message' => $result->get_error_message()] );
+		}
+
+		wp_send_json_success( [
+			'family' => $result,
+			'fonts' => GFFPDF_Font_Manager::get_all_fonts(),
+			'message' => __( 'Font uploaded successfully.', 'gf-fillable-pdf' ),
+		] );
+	}
+
+	public function ajax_delete_font(): void{
+		GFFPDF_Security::check_ajax();
+
+		$family = sanitize_key( wp_unslash( $_POST['family'] ?? '' ) );
+		if( !$family ){
+			wp_send_json_error( ['message' => __( 'Invalid font.', 'gf-fillable-pdf' )] );
+		}
+
+		GFFPDF_Font_Manager::delete_font( $family );
+		wp_send_json_success( [
+			'fonts' => GFFPDF_Font_Manager::get_all_fonts(),
+			'message' => __( 'Font Deleted', 'gf-fillable-pdf' ),
+		] );
+	}
+
+	/* -----------------------------------------------------------------------
+	 * Notification list AJAX
+	 * -------------------------------------------------------------------- */
+	public function ajax_get_notifications(): void{
+		GFFPDF_Security::check_ajax();
+
+		$form_id = absint( $_POST['form_id'] ?? 0 );
+		$form = GFAPI::get_form( $form_id );
+
+		$notifications = [];
+		if( !empty($form['notifications']) && is_array( $form['notifications'] ) ){
+			foreach( $form['notifications'] as $id => $n ){
+				$notifications[] = [
+					'id' => $id,
+					'name' => $n['name'] ?? $id,
+				];
+			}
+		}
+
+		wp_send_json_success( $notifications );
+	}
+
+	/* -----------------------------------------------------------------------
+	 * Shortcode: [gffpdf feed_id="1" entry_id="123" label="Download PDF"]
+	 * -------------------------------------------------------------------- */
+	public function shortcode_pdf_link(array $atts): string{
+		$atts = shortcode_atts( [
+			'feed_id' => 0,
+			'entry_id' => 0,
+			'label' => __( 'Download PDF', 'gf-fillable-pdf' ),
+			'class' => 'gffpdf-shortcode-link',
+		], $atts, 'gffpdf' );
+
+		$feed_id = absint( $atts['feed_id'] );
+		$entry_id = absint( $atts['entry_id'] );
+		$label = esc_html( $atts['label'] );
+		$class = esc_attr( $atts['class'] );
+
+		if( ! $entry_id ){
+			return '';
+		}
+
+		// If no feed_id given, find the first PDF for this entry
+		if( ! $feed_id ){
+			$pdfs = GFFPDF_Entry_Handler::get_entry_pdfs( $entry_id );
+			if( empty($pdfs) ){
+				return '';
+			}
+			$record = $pdfs[0];
+		}else{
+			global $wpdb;
+			$record = $wpdb->get_row( 
+				$wpdb->prepare(
+					"SELECT * FROM {$wpdb->prefix}gffpdf_entries WHERE entry_id = %d AND feed_id = %d ORDER BY generated_at DESC LIMIT 1", 
+					$entry_id, 
+					$feed_id
+				)
+			);
+		}
+
+		if( !$record || !file_exists( $record->pdf_path ) ){
+			return '';
+		}
+
+		$nonce = GFFPDF_Security::create_nonce();
+		$download_url = add_query_arg( [
+			'action' => 'gffpdf_download_pdf',
+			'pdf_id' => $record->id,
+			'nonce' => $nonce,
+		], admin_url( 'admin-ajax.php' ) );
+
+		return sprintf( 
+			'<a href="%s" class="%s">%s</a>',
+			esc_url( $download_url ),
+			$class,
+			$label,
+		);
+	}
+
+
 
 	/* -----------------------------------------------------------------------
 	 * DB CRUD (static helpers)

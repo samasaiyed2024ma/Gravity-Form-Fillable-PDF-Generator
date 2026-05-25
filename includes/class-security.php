@@ -22,8 +22,10 @@ class GFFPDF_Security {
 	 *
 	 * Any site can override this via:
 	 *   add_filter( 'gffpdf_capability', fn() => 'your_custom_cap' );
+	 * 
+	 * @return string
 	 */
-	public static function get_capability(): string {
+	public static function get_capability(){
 		$has_gf_roles = class_exists( 'GFCommon' )
 		                && method_exists( 'GFCommon', 'has_members_plugin' )
 		                && GFCommon::has_members_plugin();
@@ -88,16 +90,54 @@ class GFFPDF_Security {
 		$save_pdfs_raw = $settings['save_pdfs'] ?? null;
 		$save_pdfs     = ( $save_pdfs_raw === null ) ? true : (bool) $save_pdfs_raw;
 
+		// Sanitize notification IDs(array of integers)
+		$notification_ids = [];
+		if(!empty($settings['notification_ids']) && is_array($settings['notification_ids'])){
+			$notification_ids = array_map('sanitize_text_field', $settings['notification_ids']);
+		}
+
+		// Sanitize conditional logic rules
+		$conditional_logic = [];
+		if(!empty( $settings['conditional_logic'])  && is_array($settings['conditional_logic'])){
+			$cl = $settings['conditional_logic'];
+			$conditional_logic = [
+				'enabled' => !empty($cl['enabled']),
+				'action' => in_array($cl['action'] ?? '', ['show', 'hide'], true) ? $cl['action'] : 'show',
+				'logic_type' => in_array($cl['logic_type'] ?? '', ['all', 'any'], true) ? $cl['logic_type'] : 'all',
+				'rules' => [],
+			];
+
+			if(!empty($cl['rules']) && is_array($cl['rules'])){
+				foreach($cl['rules'] as $rule){
+					if(!is_array($rule)) continue;
+
+					$conditional_logic['rules'][] = [
+						'field_id' => sanitize_text_field($rule['field_id'] ?? ''),
+						'operator' => sanitize_text_field($rule['operator'] ?? 'is'),
+						'value' => sanitize_text_field($rule['value'] ?? ''),
+					];
+				}
+			}
+		}
+
 		return [
 			'default_font_family' => sanitize_text_field( $settings['default_font_family'] ?? 'helvetica' ),
 			'default_font_size'   => absint( $settings['default_font_size'] ?? 12 ),
-			'default_font_color'  => sanitize_hex_color( $settings['default_font_color'] ?? '#000000' ),
+			'default_font_color'  => sanitize_hex_color( $settings['default_font_color'] ?? '#000000' ) ?: '#000000',
 			'filename_pattern'    => sanitize_text_field( $settings['filename_pattern'] ?? 'submission-{entry_id}-{date}' ),
 			'save_pdfs'           => $save_pdfs,
 			'enable_logs'         => ! empty( $settings['enable_logs'] ),
 			'flatten_pdf'         => ! empty( $settings['flatten_pdf'] ),
 			'rtl_support'         => ! empty( $settings['rtl_support'] ),
 			'storage_path'        => sanitize_text_field( $settings['storage_path'] ?? GFFPDF_UPLOAD_DIR ),
+			// Per-feed settings
+			'attach_to_email'     => ! empty( $settings['attach_to_email'] ),
+			'notification_ids'    => $notification_ids,
+			'conditional_logic'   => $conditional_logic,
+			'font_family'         => sanitize_text_field( $settings['font_family'] ?? '' ),
+			'font_size'           => is_numeric( $settings['font_size'] ?? '' ) ? (float) $settings['font_size'] : '',
+			'font_color'          => sanitize_hex_color( $settings['font_color'] ?? '' ),
+			'reverse_text'        => ! empty( $settings['reverse_text'] ),
 		];
 	}
 

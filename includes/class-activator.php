@@ -88,6 +88,7 @@ class GFFPDF_Activator {
 			GFFPDF_UPLOAD_DIR . 'generated/',
 			GFFPDF_UPLOAD_DIR . 'logs/',
 			GFFPDF_UPLOAD_DIR . 'temp/',
+			GFFPDF_UPLOAD_DIR . 'fonts/',
 		];
 		foreach ( $dirs as $dir ) {
 			if ( ! file_exists( $dir ) ) wp_mkdir_p( $dir );
