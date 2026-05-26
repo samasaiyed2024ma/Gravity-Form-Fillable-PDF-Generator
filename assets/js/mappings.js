@@ -34,7 +34,7 @@
 			savedMappings = savedMappings || {};
 
 			const $section = $('#gffpdf-mappings-section');
-			const $tbody   = $('#gffpdf-mapping-rows');
+			const $tbody = $('#gffpdf-mapping-rows');
 
 			$tbody.empty();
 
@@ -76,8 +76,8 @@
 			const mappings = {};
 
 			$('#gffpdf-mapping-rows tr').each(function () {
-				const $row      = $(this);
-				const pdfField  = $row.data('pdf-field');
+				const $row = $(this);
+				const pdfField = $row.data('pdf-field');
 				const gfFieldId = $row.find('.gffpdf-gf-field-select').val();
 
 				if (pdfField !== undefined && pdfField !== '') {
@@ -104,7 +104,7 @@
 			const selectId = 'gffpdf-map-' + pdfField.replace(/[^a-zA-Z0-9]/g, '_');
 
 			const $select = $('<select>', {
-				id:    selectId,
+				id: selectId,
 				class: 'gffpdf-gf-field-select',
 			});
 
@@ -113,7 +113,7 @@
 			$.each(this.gfFields, function (i, field) {
 				const $opt = $('<option>', {
 					value: String(field.id),
-					text:  field.label + ' (field ' + field.id + ')',
+					text: field.label + ' (field ' + field.id + ')',
 				});
 
 				if (String(field.id) === savedValue) {
@@ -134,9 +134,9 @@
 			$row.append(
 				$('<td>').append(
 					$('<label>', {
-						for:   selectId,
+						for: selectId,
 						class: 'screen-reader-text',
-						text:  'GF field for ' + pdfField,
+						text: 'GF field for ' + pdfField,
 					}),
 					$select
 				)
@@ -163,23 +163,23 @@
 				$btn.prop('disabled', true).text('Mapping…');
 
 				$.post(GFFPDF.ajax_url, {
-					action:     'gffpdf_auto_map',
-					nonce:      GFFPDF.nonce,
-					form_id:    GFFPDF.form_id,
+					action: 'gffpdf_auto_map',
+					nonce: GFFPDF.nonce,
+					form_id: GFFPDF.form_id,
 					pdf_fields: pdfFields,
 				})
-				.done(function (res) {
-					if (!res.success) return;
+					.done(function (res) {
+						if (!res.success) return;
 
-					// res.data = { pdfFieldName: gfFieldId }
-					$.each(res.data, function (pdfField, gfFieldId) {
-						const safeName = pdfField.replace(/[^a-zA-Z0-9]/g, '_');
-						$('#gffpdf-map-' + safeName).val(String(gfFieldId));
+						// res.data = { pdfFieldName: gfFieldId }
+						$.each(res.data, function (pdfField, gfFieldId) {
+							const safeName = pdfField.replace(/[^a-zA-Z0-9]/g, '_');
+							$('#gffpdf-map-' + safeName).val(String(gfFieldId));
+						});
+					})
+					.always(function () {
+						$btn.prop('disabled', false).text('⚡ Auto Map');
 					});
-				})
-				.always(function () {
-					$btn.prop('disabled', false).text('⚡ Auto Map');
-				});
 			});
 		},
 

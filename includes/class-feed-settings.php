@@ -529,12 +529,29 @@ class GFFPDF_Feed_Settings {
 	private function get_gf_fields( array $form ): array {
 		if ( empty( $form['fields'] ) ) return [];
 
+		// Field types that carry a fixed set of choices
+		$choice_types = ['select', 'radio', 'checkbox', 'multiselect', 'list'];
+
 		$fields = [];
 		foreach ( $form['fields'] as $field ) {
+			// Collect choices for option-based field types
+			$choices = [];
+			if(in_array($field->type, $choice_types, true) && !empty($field->choices) && is_array($field->choices)){
+				foreach($field->choices as $choice){
+					if(isset($choice['value'])){
+						$choices[] = [
+							'value' => $choice['value'],
+							'text' => $choice['text'] ?? $choice['value'],
+						];
+					}
+				}
+			}
+
 			$fields[] = [
 				'id'    => $field->id,
 				'label' => $field->label,
 				'type'  => $field->type,
+				'choices' => $choices,
 			];
 
 			// Sub-fields (e.g. Name, Address)
@@ -545,6 +562,7 @@ class GFFPDF_Feed_Settings {
 							'id'    => $input['id'],
 							'label' => $field->label . ' (' . $input['label'] . ')',
 							'type'  => $field->type,
+							'choice' => [], // sub-fields don't have their own choices
 						];
 					}
 				}

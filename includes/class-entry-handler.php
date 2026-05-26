@@ -17,9 +17,6 @@ class GFFPDF_Entry_Handler {
 
 	/**
 	 * Called after each successful Gravity Forms submission.
-	 *
-	 * @param array $entry  Gravity Forms entry
-	 * @param array $form   Gravity Forms form
 	 */
 	public function generate_pdf( array $entry, array $form ): void {
 		$form_id = absint( $form['id'] );
@@ -30,89 +27,106 @@ class GFFPDF_Entry_Handler {
 		}
 
 		foreach ( $feeds as $feed ) {
-			$this->process_feed( $feed, $entry, $form );
+			$result = $this->process_feed( $feed, $entry, $form );
+			// WP_Error results are already logged inside process_feed; nothing else needed here.
+			if ( is_wp_error( $result ) && $result->get_error_code() !== 'conditional_logic' ) {
+				GFFPDF_Logger::error( 'Submission PDF failed', [
+					'feed_id'  => $feed->id,
+					'entry_id' => $entry['id'],
+					'reason'   => $result->get_error_message(),
+				] );
+			}
 		}
 	}
 
 	/**
 	 * Process a single feed for a given entry.
+	 *
+	 * @return int|WP_Error  DB record ID on success, WP_Error describing the failure.
 	 */
-	public function process_feed( object $feed, array $entry, array $form ): ?int {
+	public function process_feed( object $feed, array $entry, array $form ) {
 		$feed_id       = (int) $feed->id;
 		$template_path = $feed->template_path;
 		$settings      = json_decode( $feed->settings, true ) ?? [];
 		$mappings      = json_decode( $feed->mappings, true ) ?? [];
 
+		// --- Template check ---
 		if ( empty( $template_path ) || ! file_exists( $template_path ) ) {
 			GFFPDF_Logger::error( 'Template file missing', [ 'feed_id' => $feed_id, 'path' => $template_path ] );
-			return null;
+			return new WP_Error( 'template_missing',
+				sprintf( __( 'Feed "%s": PDF template file is missing or has not been uploaded.', 'gf-fillable-pdf' ), $feed->feed_name )
+			);
 		}
 
-		if ( empty( $mappings ) ) {
-			GFFPDF_Logger::warn( 'No field mappings configured — skipping PDF generation.', [ 'feed_id' => $feed_id ] );
-			return null;
-		}
-
-		// Conditional logic check
-		if( !$this->passes_conditional_logic( $settings, $entry, $form )){
-			GFFPDF_Logger::info( 
-				'Feed skipped due to conditional logic', 
-				[
-					'feed_id' => $feed_id,
-					'entry_id' => $entry['id'],
-				]);
-				return null;
-		}
-
-		// Filter out any unmapped entries (value is empty string or "0")
-		// so we don't write blank values into the PDF for intentionally skipped fields.
-		$mappings = array_filter( $mappings, function( $gf_field_id ) {
+		// --- Mappings check (filter out intentionally unmapped "0"/empty values) ---
+		$active_mappings = array_filter( $mappings, function( $gf_field_id ) {
 			return $gf_field_id !== '' && $gf_field_id !== '0' && $gf_field_id !== 0;
 		} );
 
-		// Build field values from entry
-		$field_values = $this->build_field_values( $mappings, $entry, $form );
+		if ( empty( $active_mappings ) ) {
+			GFFPDF_Logger::warn( 'No field mappings configured', [ 'feed_id' => $feed_id ] );
+			return new WP_Error( 'no_mappings',
+				sprintf( __( 'Feed "%s": no field mappings configured — please map at least one PDF field to a form field.', 'gf-fillable-pdf' ), $feed->feed_name )
+			);
+		}
 
-		// Generate PDF bytes
+		// --- Conditional logic ---
+		if ( ! $this->passes_conditional_logic( $settings, $entry, $form ) ) {
+			GFFPDF_Logger::info( 'Feed skipped: conditional logic', [ 'feed_id' => $feed_id, 'entry_id' => $entry['id'] ] );
+			return new WP_Error( 'conditional_logic',
+				sprintf( __( 'Feed "%s": skipped — conditional logic rules not met for this entry.', 'gf-fillable-pdf' ), $feed->feed_name )
+			);
+		}
+
+		// --- Build field values & generate ---
+		$field_values = $this->build_field_values( $active_mappings, $entry, $form );
+
 		$generator = new GFFPDF_PDF_Generator();
 		$pdf_bytes = $generator->generate( $template_path, $field_values, $settings );
 
 		if ( is_wp_error( $pdf_bytes ) ) {
 			GFFPDF_Logger::error( 'PDF generation failed', [
-				'feed_id' => $feed_id,
+				'feed_id'  => $feed_id,
 				'entry_id' => $entry['id'],
-				'error'   => $pdf_bytes->get_error_message(),
+				'error'    => $pdf_bytes->get_error_message(),
 			] );
-			return null;
+			return new WP_Error(
+				$pdf_bytes->get_error_code(),
+				sprintf( 'Feed "%s": %s', $feed->feed_name, $pdf_bytes->get_error_message() )
+			);
 		}
 
-		// Resolve filename
-		$global_settings  = GFFPDF_Settings::get_settings();
-		$pattern          = $settings['filename_pattern'] ?? $global_settings['filename_pattern'];
-		$filename         = GFFPDF_Helpers::resolve_filename( $pattern, $entry, $form );
-		$filename         = GFFPDF_Helpers::ensure_pdf_extension( $filename );
+		// --- Resolve filename ---
+		$global_settings = GFFPDF_Settings::get_settings();
+		$pattern         = $settings['filename_pattern'] ?? $global_settings['filename_pattern'];
+		$filename        = GFFPDF_Helpers::resolve_filename( $pattern, $entry, $form );
+		$filename        = GFFPDF_Helpers::ensure_pdf_extension( $filename );
 
-		// Save to disk — default to TRUE so PDFs are saved unless explicitly disabled.
+		// --- Save to disk ---
 		$save = $global_settings['save_pdfs'] ?? true;
 		if ( $save === false || $save === 0 || $save === '0' ) {
-			return null;
+			return new WP_Error( 'save_disabled',
+				sprintf( 'Feed "%s": PDF saving is disabled in global settings.', $feed->feed_name )
+			);
 		}
 
 		$path = GFFPDF_File_Handler::save_generated( $pdf_bytes, $filename );
 		if ( is_wp_error( $path ) ) {
 			GFFPDF_Logger::error( 'PDF save failed', [ 'feed_id' => $feed_id, 'entry' => $entry['id'] ] );
-			return null;
+			return new WP_Error(
+				$path->get_error_code(),
+				sprintf( 'Feed "%s": %s', $feed->feed_name, $path->get_error_message() )
+			);
 		}
 
-		// Store record in DB
+		// --- Store record in DB ---
 		$record_id = self::save_pdf_record( $entry['id'], $form['id'], $feed_id, $path );
 
-		// Attach to selected notifications (oe all id legacy attach_to_email is set)
+		// --- Attach to notifications ---
 		$selected_notifications = $settings['notification_ids'] ?? [];
-		if( ! empty( $selected_notifications ) && is_array( $selected_notifications ) ){
+		if ( ! empty( $selected_notifications ) && is_array( $selected_notifications ) ) {
 			$this->attach_to_selected_notifications( $path, $form, $entry, $selected_notifications );
-		}elseif ( ! empty( $settings['attach_to_email'] ) ){
-			// Attach to all notifications
+		} elseif ( ! empty( $settings['attach_to_email'] ) ) {
 			$this->attach_to_notifications( $path, $form, $entry );
 		}
 
@@ -124,6 +138,7 @@ class GFFPDF_Entry_Handler {
 
 		return $record_id;
 	}
+
 
 	/* -----------------------------------------------------------------------
 	 * Conditional logic
@@ -147,7 +162,7 @@ class GFFPDF_Entry_Handler {
 		foreach($rules as $rule){
 			$field_id = (string) ( $rule['field_id'] ?? '' );
 			$operator = $rule['operator'] ?? 'is';
-			$expected = (string) ( $rule['vaue'] ?? '' );
+			$expected = (string) ( $rule['value'] ?? '' );
 			$actual = (string) rgar($entry, $field_id);
 
 			$results[] = $this->evaluate_rule($actual, $operator, $expected);
@@ -267,7 +282,7 @@ class GFFPDF_Entry_Handler {
 	private function attach_to_selected_notifications(string $pdf_path, array $form, array $entry, array $notification_ids): void{
 		add_filter('gform_notification', function($notification, $form_obj, $entry_obj) use ($pdf_path, $form, $notification_ids){
 			if( $form_obj['id'] !== $form['id'] ) return $notification;
-			if( !in_array( $notification['id'] ?? '', $notification, true ) ) return $notification;
+			if( !in_array( $notification['id'] ?? '', $notification_ids, true ) ) return $notification;
 
 			if( !isset( $notification['attachments'] ) || ! is_array( $notification['attachments'] ) ){
 				$notification['attachments'] = [];
@@ -321,50 +336,90 @@ class GFFPDF_Entry_Handler {
 	 * -------------------------------------------------------------------- */
 
 	public function ajax_regenerate(): void {
-		// Supports both GET (plain link) and POST (AJAX button)
+		// Buffer any stray output (PHP notices, plugin debug output, etc.) that
+		// would prepend to the JSON response and cause jQuery to fail parsing it,
+		// which manifests as "HTTP 200: Request failed" in the browser.
+		ob_start();
+
 		$entry_id = absint( $_REQUEST['entry_id'] ?? 0 );
 		$nonce    = sanitize_text_field( wp_unslash( $_REQUEST['nonce'] ?? '' ) );
 
 		if ( ! $entry_id ) {
-			wp_send_json_error( [ 'message' => esc_html__( 'Invalid entry ID.', 'gf-fillable-pdf' ) ] );
+			ob_end_clean();
+			wp_send_json_error( [ 'message' => esc_html__( 'Invalid entry ID.', 'gf-fillable-pdf' ) ], 400 );
+			return;
 		}
 
 		if ( ! GFFPDF_Security::verify_nonce( $nonce, 'gffpdf_regenerate_' . $entry_id ) ) {
-			wp_send_json_error( [ 'message' => esc_html__( 'Security check failed.', 'gf-fillable-pdf' ) ], 403 );
+			ob_end_clean();
+			wp_send_json_error( [ 'message' => esc_html__( 'Security check failed. Please refresh the page and try again.', 'gf-fillable-pdf' ) ], 403 );
+			return;
 		}
 
 		if ( ! GFFPDF_Security::current_user_can() ) {
+			ob_end_clean();
 			wp_send_json_error( [ 'message' => esc_html__( 'Permission denied.', 'gf-fillable-pdf' ) ], 403 );
+			return;
 		}
 
 		$entry = GFAPI::get_entry( $entry_id );
 		if ( is_wp_error( $entry ) ) {
-			wp_send_json_error( [ 'message' => esc_html__( 'Entry not found.', 'gf-fillable-pdf' ) ] );
+			ob_end_clean();
+			wp_send_json_error( [ 'message' => esc_html__( 'Entry not found.', 'gf-fillable-pdf' ) ], 400 );
+			return;
 		}
 
 		$form  = GFAPI::get_form( $entry['form_id'] );
 		$feeds = GFFPDF_Feed_Settings::get_active_feeds_by_form( $entry['form_id'] );
 
 		if ( empty( $feeds ) ) {
-			wp_send_json_error( [ 'message' => esc_html__( 'No active feeds found for this form.', 'gf-fillable-pdf' ) ] );
+			ob_end_clean();
+			wp_send_json_error( [ 'message' => esc_html__( 'No active feeds found for this form. Please create and activate a feed first.', 'gf-fillable-pdf' ) ], 400 );
+			return;
 		}
 
 		$generated = 0;
+		$errors    = [];
+
 		foreach ( $feeds as $feed ) {
 			$result = $this->process_feed( $feed, $entry, $form );
-			if ( $result ) {
+
+			if ( is_wp_error( $result ) ) {
+				if ( $result->get_error_code() === 'conditional_logic' ) {
+					GFFPDF_Logger::info( $result->get_error_message(), [] );
+				} else {
+					$errors[] = $result->get_error_message();
+				}
+			} else {
 				$generated++;
 			}
 		}
 
-		if ( $generated === 0 ) {
-			wp_send_json_error( [ 'message' => esc_html__( 'PDF generation failed. Check debug log for details.', 'gf-fillable-pdf' ) ] );
+		if ( $generated === 0 && empty( $errors ) ) {
+			ob_end_clean();
+			wp_send_json_error( [ 'message' => esc_html__( 'All feeds were skipped — conditional logic rules were not met for this entry.', 'gf-fillable-pdf' ) ], 400 );
+			return;
 		}
 
+		if ( $generated === 0 && ! empty( $errors ) ) {
+			ob_end_clean();
+			wp_send_json_error( [ 'message' => implode( "\n", $errors ) ], 400 );
+			return;
+		}
+
+		$success_msg = sprintf(
+			_n( '%d PDF generated successfully.', '%d PDFs generated successfully.', $generated, 'gf-fillable-pdf' ),
+			$generated
+		);
+
+		if ( ! empty( $errors ) ) {
+			$success_msg .= ' ' . esc_html__( 'Warning:', 'gf-fillable-pdf' ) . ' ' . implode( ' | ', $errors );
+		}
+
+		ob_end_clean();
 		wp_send_json_success( [
-			'message'   => sprintf( _n( '%d PDF generated successfully.', '%d PDFs generated successfully.', $generated, 'gf-fillable-pdf' ), $generated ),
+			'message'   => $success_msg,
 			'generated' => $generated,
-			'redirect'  => admin_url( 'admin.php?page=gf_entries&view=entry&id=' . $entry['form_id'] . '&lid=' . $entry_id ),
 		] );
 	}
 }

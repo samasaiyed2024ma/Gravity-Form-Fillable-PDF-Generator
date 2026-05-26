@@ -36,21 +36,18 @@
 							<span class="gffpdf-toggle-slider"></span>
 						</label>
 					</td>
-				
-				    <td class="column-name column-primary">
+
+					<td class="column-name column-primary">
 						<strong><?php echo esc_html( $feed->feed_name ); ?></strong>
 						<button type="button" class="toggle-row"><span class="screen-reader-text"><?php esc_html_e( 'Show more details', 'gf-fillable-pdf' ); ?></span></button>
 						<div class="action-btn">
-							<a 	class="gffpdf-edit-feed"
-								data-feed-id="<?php echo esc_attr( $feed->id ); ?>">
+							<a class="gffpdf-edit-feed" data-feed-id="<?php echo esc_attr( $feed->id ); ?>">
 								<?php esc_html_e( 'Edit', 'gf-fillable-pdf' ); ?>
 							</a> <span>|</span>
-							<a	class="gffpdf-duplicate-feed"
-								data-feed-id="<?php echo esc_attr( $feed->id ); ?>">
+							<a class="gffpdf-duplicate-feed" data-feed-id="<?php echo esc_attr( $feed->id ); ?>">
 								<?php esc_html_e( 'Duplicate', 'gf-fillable-pdf' ); ?>
 							</a> <span>|</span>
-							<a class="button-link-delete gffpdf-delete-feed"
-								data-feed-id="<?php echo esc_attr( $feed->id ); ?>">
+							<a class="button-link-delete gffpdf-delete-feed" data-feed-id="<?php echo esc_attr( $feed->id ); ?>">
 								<?php esc_html_e( 'Delete', 'gf-fillable-pdf' ); ?>
 							</a>
 						</div>
@@ -58,20 +55,23 @@
 
 					<td class="column-template" data-colname="<?php esc_attr_e( 'Template', 'gf-fillable-pdf' ); ?>">
 						<?php if ( $missing ) : ?>
-							<span class="gffpdf-badge gffpdf-badge--error"><?php esc_html_e( 'Missing', 'gf-fillable-pdf' ); ?></span>
+							<span class="gffpdf-badge gffpdf-badge--error">⚠ <?php esc_html_e( 'Missing', 'gf-fillable-pdf' ); ?></span>
 						<?php else : ?>
 							<?php echo esc_html( $template_name ); ?>
 						<?php endif; ?>
 					</td>
 
 					<td class="column-mappings" data-colname="<?php esc_attr_e( 'Mappings', 'gf-fillable-pdf' ); ?>">
-						<?php
-						printf(
-							/* translators: %d: number of mapped fields */
-							esc_html( _n( '%d field mapped', '%d fields mapped', $mapping_count, 'gf-fillable-pdf' ) ),
-							$mapping_count
-						);
-						?>
+						<?php if ( $mapping_count > 0 ) : ?>
+							<span class="gffpdf-mapping-chip">
+								<?php printf(
+									esc_html( _n( '%d mapped', '%d mapped', $mapping_count, 'gf-fillable-pdf' ) ),
+									$mapping_count
+								); ?>
+							</span>
+						<?php else : ?>
+							<span class="gffpdf-badge gffpdf-badge--gray"><?php esc_html_e( 'None', 'gf-fillable-pdf' ); ?></span>
+						<?php endif; ?>
 					</td>
 
 				</tr>

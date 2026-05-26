@@ -69,7 +69,7 @@ class GFFPDF_Admin_Menu {
 		);
 
 		wp_enqueue_script(
-			'gff-admin',
+			'gffpdf-admin',
 			GFFPDF_URL . 'assets/js/admin.js',
 			[ 'jquery' ],
 			GFFPDF_VERSION,
@@ -218,9 +218,6 @@ class GFFPDF_Admin_Menu {
 	 * -------------------------------------------------------------------- */
 
 	public function add_entry_list_actions( $actions, $filter, $entry, $form_id ) {
-		// Temporary debug — remove after confirming values
-		error_log( 'gform_entries_action_links args: ' . print_r( func_get_args(), true ) );
-
 		if ( ! is_array( $entry ) || empty( $entry['id'] ) ) {
 			return $actions;
 		}
@@ -260,29 +257,34 @@ class GFFPDF_Admin_Menu {
 		echo '<h3 class="hndle"><span>' . esc_html__( 'Fillable PDFs', 'gf-fillable-pdf' ) . '</span></h3>';
 		echo '<div class="inside">';
 
-		echo '<div id="gffpdf-regen-notice" style="display:none;margin-bottom:8px;padding:6px 10px;border-radius:3px;font-size:13px;"></div>';
+		echo '<div id="gffpdf-regen-notice" style="display:none;margin-bottom:8px;padding:8px 12px;border-radius:4px;font-size:13px;line-height:1.5;"></div>';
 
 		if ( empty( $pdfs ) ) {
-			echo '<p>' . esc_html__( 'No PDFs generated for this entry yet.', 'gf-fillable-pdf' ) . '</p>';
+			echo '<p style="color:#666;font-style:italic;">' . esc_html__( 'No PDFs generated for this entry yet.', 'gf-fillable-pdf' ) . '</p>';
 		} else {
-			echo '<ul class="gffpdf-pdf-list" id="gffpdf-pdf-list">';
+			echo '<ul class="gffpdf-pdf-list" id="gffpdf-pdf-list" style="margin:0 0 10px;padding:0;list-style:none;">';
 			foreach ( $pdfs as $pdf ) {
 				$nonce        = GFFPDF_Security::create_nonce();
 				$view_url     = add_query_arg( [ 'action' => 'gffpdf_view_pdf',     'pdf_id' => $pdf->id, 'nonce' => $nonce ], admin_url( 'admin-ajax.php' ) );
 				$download_url = add_query_arg( [ 'action' => 'gffpdf_download_pdf', 'pdf_id' => $pdf->id, 'nonce' => $nonce ], admin_url( 'admin-ajax.php' ) );
 				$name         = basename( $pdf->pdf_path );
+				$exists       = file_exists( $pdf->pdf_path );
 
-				echo '<li>';
-				echo '<strong>' . esc_html( $name ) . '</strong><br>';
-				echo '<a href="' . esc_url( $view_url ) . '" target="_blank">' . esc_html__( 'View PDF', 'gf-fillable-pdf' ) . '</a> &nbsp;';
-				echo '<a href="' . esc_url( $download_url ) . '">' . esc_html__( 'Download', 'gf-fillable-pdf' ) . '</a>';
+				echo '<li style="padding:6px 0;border-bottom:1px solid #f0f0f0;">';
+				echo '<strong style="display:block;font-size:13px;">' . esc_html( $name ) . '</strong>';
+				if ( $exists ) {
+					echo '<a href="' . esc_url( $view_url ) . '" target="_blank" style="font-size:12px;">' . esc_html__( 'View', 'gf-fillable-pdf' ) . '</a> &nbsp;';
+					echo '<a href="' . esc_url( $download_url ) . '" style="font-size:12px;">' . esc_html__( 'Download', 'gf-fillable-pdf' ) . '</a>';
+				} else {
+					echo '<span style="font-size:12px;color:#dc2626;">⚠ ' . esc_html__( 'File missing', 'gf-fillable-pdf' ) . '</span>';
+				}
 				echo '</li>';
 			}
 			echo '</ul>';
 		}
 
-		// Regenerate button — fires AJAX, shows inline result, then reloads
-		echo '<p>';
+		// Regenerate button
+		echo '<p style="margin:10px 0 0;">';
 		echo '<button type="button" id="gffpdf-regen-btn" class="button button-secondary"';
 		echo ' data-entry-id="' . esc_attr( $entry_id ) . '"';
 		echo ' data-nonce="' . esc_attr( $regen_nonce ) . '"';
@@ -291,45 +293,64 @@ class GFFPDF_Admin_Menu {
 		echo '</button>';
 		echo '</p>';
 
-		// Inline script — no extra JS file needed
 		?>
 		<script type="text/javascript">
 		(function($){
 			$('#gffpdf-regen-btn').on('click', function(){
 				var $btn    = $(this);
 				var $notice = $('#gffpdf-regen-notice');
+				var originalText = $btn.text();
 
 				$btn.prop('disabled', true).text('<?php echo esc_js( __( 'Generating…', 'gf-fillable-pdf' ) ); ?>');
-				$notice.hide();
+				$notice.hide().removeAttr('style');
 
-				$.post($btn.data('ajax-url'), {
-					action:   'gffpdf_regenerate',
-					entry_id: $btn.data('entry-id'),
-					nonce:    $btn.data('nonce')
-				})
-				.done(function(res){
-					if (res.success) {
-						$notice
-							.css({background:'#d4edda', color:'#155724', border:'1px solid #c3e6cb'})
-							.text(res.data.message)
-							.show();
-						// Reload page after short delay so new PDF list is shown
-						setTimeout(function(){ location.reload(); }, 1200);
-					} else {
-						var msg = (res.data && res.data.message) ? res.data.message : '<?php echo esc_js( __( 'An error occurred.', 'gf-fillable-pdf' ) ); ?>';
-						$notice
-							.css({background:'#f8d7da', color:'#721c24', border:'1px solid #f5c6cb'})
-							.text(msg)
-							.show();
-						$btn.prop('disabled', false).text('<?php echo esc_js( __( 'Regenerate PDFs', 'gf-fillable-pdf' ) ); ?>');
+				$.ajax({
+					url:      $btn.data('ajax-url'),
+					type:     'POST',
+					dataType: 'json',
+					data: {
+						action:   'gffpdf_regenerate',
+						entry_id: $btn.data('entry-id'),
+						nonce:    $btn.data('nonce')
 					}
 				})
-				.fail(function(){
+				.done(function(res){
+					if (res && res.success) {
+						$notice
+							.css({ background: '#ecfdf5', color: '#065f46', border: '1px solid #a7f3d0', padding: '8px 12px', borderRadius: '4px', fontSize: '13px', marginBottom: '8px' })
+							.text(res.data.message)
+							.show();
+						setTimeout(function(){ location.reload(); }, 1500);
+					} else {
+						var msg = (res && res.data && res.data.message)
+							? res.data.message
+							: '<?php echo esc_js( __( 'PDF generation failed. Please check your feed settings.', 'gf-fillable-pdf' ) ); ?>';
+						$notice
+							.css({ background: '#fef2f2', color: '#991b1b', border: '1px solid #fca5a5', padding: '8px 12px', borderRadius: '4px', fontSize: '13px', marginBottom: '8px' })
+							.text(msg)
+							.show();
+						$btn.prop('disabled', false).text(originalText);
+					}
+				})
+				.fail(function(xhr, status, error){
+					// Try to parse a JSON body from the error response
+					var msg = '<?php echo esc_js( __( 'Request failed. Please refresh the page and try again.', 'gf-fillable-pdf' ) ); ?>';
+					try {
+						var body = JSON.parse(xhr.responseText);
+						if (body && body.data && body.data.message) {
+							msg = body.data.message;
+						}
+					} catch(e) {
+						// If we can't parse JSON, include the HTTP status to help debug
+						if (xhr.status) {
+							msg = 'HTTP ' + xhr.status + ': ' + msg;
+						}
+					}
 					$notice
-						.css({background:'#f8d7da', color:'#721c24', border:'1px solid #f5c6cb'})
-						.text('<?php echo esc_js( __( 'Request failed. Please try again.', 'gf-fillable-pdf' ) ); ?>')
+						.css({ background: '#fef2f2', color: '#991b1b', border: '1px solid #fca5a5', padding: '8px 12px', borderRadius: '4px', fontSize: '13px', marginBottom: '8px' })
+						.text(msg)
 						.show();
-					$btn.prop('disabled', false).text('<?php echo esc_js( __( 'Regenerate PDFs', 'gf-fillable-pdf' ) ); ?>');
+					$btn.prop('disabled', false).text(originalText);
 				});
 			});
 		}(jQuery));

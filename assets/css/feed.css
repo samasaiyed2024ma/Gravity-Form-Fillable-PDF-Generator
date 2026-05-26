@@ -1,289 +1,847 @@
 /* ==========================================================================
-   GF Fillable PDF Generator — Feed Settings Styles
+   GF Fillable PDF Generator — Feed Styles
    ========================================================================== */
 
-#gffpdf-add-feed{
-    background: #1558a0;
-    color: #fff;
-    border-color: #1558a0;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 8px 16px;
-    border-radius: 6px;
-    font-size: .875rem;
-    font-weight: 500;
-    cursor: pointer;
-    text-decoration: none;
-    border: 1px solid transparent;
-    transition: all .2s;
-    line-height: 1;
-    float: right;
-    margin-top: 10px;
+/* ── CSS Variables ─────────────────────────────────────────────────────── */
+:root {
+	--fp-blue: #2563eb;
+	--fp-blue-dk: #1d4ed8;
+	--fp-blue-lt: #eff6ff;
+	--fp-green: #16a34a;
+	--fp-red: #dc2626;
+	--fp-amber: #d97706;
+	--fp-gray-50: #f9fafb;
+	--fp-gray-100: #f3f4f6;
+	--fp-gray-200: #e5e7eb;
+	--fp-gray-400: #9ca3af;
+	--fp-gray-600: #4b5563;
+	--fp-gray-800: #1f2937;
+	--fp-radius-sm: 6px;
+	--fp-radius: 10px;
+	--fp-radius-lg: 14px;
+	--fp-shadow-sm: 0 1px 3px rgba(0, 0, 0, .08), 0 1px 2px rgba(0, 0, 0, .06);
+	--fp-shadow: 0 4px 16px rgba(0, 0, 0, .10);
+	--fp-transition: all .2s cubic-bezier(.4, 0, .2, 1);
 }
 
-/* ── Feed table ──────────────────────────────────────────────────────── */
-.gffpdf-feed-table{
-	border-radius: 4px;
+/* ── Page wrap ─────────────────────────────────────────────────── */
+.gffpdf-wrap {
+	max-width: 880px;
 }
 
-.gffpdf-feed-table .column-name     { width: 25%; }
-.gffpdf-feed-table .column-template { width: 25%; }
-.gffpdf-feed-table .column-mappings { width: 15%; }
-.gffpdf-feed-table .column-status  { width: 10%; }
-
-.column-name strong{
-    color: #2271b1;
-    text-transform: capitalize;
-}
-
-/* ── Field rows ──────────────────────────────────────────────────────── */
-.gffpdf-field-row {
-	margin-bottom: 1.25rem;
-}
-.gffpdf-field-row label {
-	display: block;
-	font-weight: 600;
-	margin-bottom: .35rem;
-}
-.gffpdf-field-row .description {
-	color: #646970;
-	font-size: .85rem;
-	margin-top: .35rem;
-}
-.gffpdf-field-row--inline {
+/* ── Page header ───────────────────────────────────────────────── */
+.gffpdf-page-header {
 	display: flex;
 	align-items: center;
-	gap: .75rem;
-}
-.gffpdf-field-row--inline label { margin-bottom: 0; }
-
-.action-btn a{
-    color: #2271b1;
+	justify-content: space-between;
+	margin-bottom: 24px;
+	flex-wrap: wrap;
+	gap: 12px;
 }
 
-.action-btn span{
-    color: #979797;
+.gffpdf-page-header-left h1 {
+	font-size: 1.35rem;
+	font-weight: 700;
+	color: var(--fp-gray-800);
+	margin: 0 0 2px;
+	line-height: 1.3;
 }
 
-.action-btn{
-    margin-top: 4px;
-    font-size: 13px;
-    cursor: pointer;
+.gffpdf-page-header-left .gffpdf-form-badge {
+	display: inline-block;
+	font-size: 12px;
+	color: var(--fp-gray-600);
+	background: var(--fp-gray-100);
+	border-radius: 20px;
+	padding: 2px 10px;
+	font-weight: 500;
+}
+
+.gffpdf-btn-add {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	background: var(--fp-blue);
+	color: #fff !important;
+	border: none;
+	border-radius: var(--fp-radius-sm);
+	padding: 9px 18px;
+	font-size: 13.5px;
+	font-weight: 600;
+	cursor: pointer;
+	transition: var(--fp-transition);
+	box-shadow: 0 1px 4px rgba(37, 99, 235, .25);
+	text-decoration: none;
+}
+
+.gffpdf-btn-add:hover {
+	background: var(--fp-blue-dk);
+	transform: translateY(-1px);
+	box-shadow: 0 4px 12px rgba(37, 99, 235, .35);
+}
+
+/* ── Notice ─────────────────────────────────────────────────────── */
+#gffpdf-notice {
+	border-radius: var(--fp-radius-sm);
+	padding: 12px 16px;
+	margin-bottom: 20px;
+	font-weight: 500;
+	font-size: 13.5px;
+}
+
+.gffpdf-notice--success {
+	background: #ecfdf5;
+	color: #065f46;
+	border-left: 4px solid var(--fp-green);
+}
+
+.gffpdf-notice--error {
+	background: #fef2f2;
+	color: #991b1b;
+	border-left: 4px solid var(--fp-red);
+}
+
+/* ── Feed list ──────────────────────────────────────────────────── */
+#gffpdf-feed-list-wrap {
+	transition: opacity .2s;
+}
+
+.gffpdf-feed-table {
+	border-radius: var(--fp-radius) !important;
+	overflow: hidden;
+	box-shadow: var(--fp-shadow-sm);
+	border: 1px solid var(--fp-gray-200) !important;
+}
+
+.gffpdf-feed-table thead tr {
+	background: var(--fp-gray-50);
+}
+
+.gffpdf-feed-table thead th {
+	font-size: 11.5px;
+	text-transform: uppercase;
+	letter-spacing: .05em;
+	color: var(--fp-gray-600);
+	font-weight: 600;
+	padding: 12px 16px !important;
+	border-bottom: 1px solid var(--fp-gray-200);
+}
+
+.gffpdf-feed-table tbody tr {
+	transition: background .15s;
+}
+
+.gffpdf-feed-table tbody tr:hover {
+	background: var(--fp-blue-lt) !important;
+}
+
+.gffpdf-feed-table tbody td {
+	padding: 14px 16px !important;
+	vertical-align: middle;
+	border-bottom: 1px solid var(--fp-gray-100);
+}
+
+.gffpdf-feed-table .column-name {
+	width: 28%;
+}
+
+.gffpdf-feed-table .column-template {
+	width: 26%;
+}
+
+.gffpdf-feed-table .column-mappings {
+	width: 20%;
+}
+
+.gffpdf-feed-table .column-status {
+	width: 12%;
+}
+
+.column-name strong {
+	font-size: 13.5px;
+	font-weight: 600;
+	color: var(--fp-gray-800);
+}
+
+/* Feed row actions */
+.action-btn {
+	margin-top: 5px;
+	font-size: 12.5px;
 	opacity: 0;
 	visibility: hidden;
-	transform: translateY(2px);
-	transition: all 0.2s ease;
+	transform: translateY(3px);
+	transition: var(--fp-transition);
 }
 
-.gffpdf-feed-table tr:hover .action-btn{
+.gffpdf-feed-table tr:hover .action-btn {
 	opacity: 1;
 	visibility: visible;
 	transform: translateY(0);
 }
 
-
-/* ── Upload area ─────────────────────────────────────────────────────── */
-.gffpdf-upload-area {
-	border: 2px dashed #c3c4c7;
-	border-radius: 4px;
-	padding: 1.25rem;
-	background: #f6f7f7;
-}
-.gffpdf-upload-status {
-	display: inline-block;
-	margin-left: .75rem;
-	font-style: italic;
-	color: #646970;
-}
-.gffpdf-upload-status.success { color: #00a32a; font-style: normal; font-weight: 600; }
-.gffpdf-upload-status.error   { color: #d63638; font-style: normal; }
-
-/* ── Mapping actions ─────────────────────────────────────────────────── */
-.gffpdf-mapping-actions { margin-bottom: .75rem; }
-
-/* ── Mapping table ───────────────────────────────────────────────────── */
-.gffpdf-mapping-table th { background: #f6f7f7; font-weight: 600; }
-.gffpdf-mapping-table td,
-.gffpdf-mapping-table th { padding: .5rem .75rem; }
-.gffpdf-mapping-table select { width: 100%; }
-.gffpdf-mapping-table .pdf-field-name { font-family: monospace; font-size: .85rem; }
-
-/* ── Modal ───────────────────────────────────────────────────────────── */
-.gffpdf-modal {
-	position: fixed;
-	inset: 0;
-	z-index: 100000;
-	display: flex;
-	align-items: flex-start;
-	justify-content: center;
-	padding: 2rem 1rem;
-	overflow-y: auto;
-}
-.gffpdf-modal-backdrop {
-	position: fixed;
-	inset: 0;
-	background: rgba(0,0,0,.6);
-}
-.gffpdf-modal-dialog {
-	position: relative;
-	background: #fff;
-	border-radius: 6px;
-	box-shadow: 0 8px 32px rgba(0,0,0,.25);
-	width: 100%;
-	max-width: 760px;
-	display: flex;
-	flex-direction: column;
-}
-.gffpdf-modal-header {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	padding: 1rem 1.25rem;
-	border-bottom: 1px solid #c3c4c7;
-}
-.gffpdf-modal-header h2 { margin: 0; font-size: 1.1rem; }
-.gffpdf-modal-close {
-	background: none;
-	border: none;
-	font-size: 1.5rem;
-	line-height: 1;
+.action-btn a {
+	color: var(--fp-blue);
 	cursor: pointer;
-	color: #646970;
-	padding: 0 .25rem;
-}
-.gffpdf-modal-close:hover { color: #d63638; }
-.gffpdf-modal-body {
-	padding: 1.25rem;
-	overflow-y: auto;
-	max-height: calc(100vh - 200px);
-}
-.gffpdf-modal-footer {
-	padding: 1rem 1.25rem;
-	border-top: 1px solid #c3c4c7;
-	display: flex;
-	gap: .5rem;
-	justify-content: flex-end;
+	font-weight: 500;
+	text-decoration: none;
 }
 
-/* ── Spinner ─────────────────────────────────────────────────────────── */
-.gffpdf-spinner {
+.action-btn a:hover {
+	text-decoration: underline;
+}
+
+.action-btn a.button-link-delete {
+	color: var(--fp-red);
+}
+
+.action-btn span {
+	color: var(--fp-gray-400);
+	margin: 0 4px;
+}
+
+/* Badge */
+.gffpdf-badge {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	font-size: 12px;
+	font-weight: 600;
+	padding: 3px 10px;
+	border-radius: 20px;
+}
+
+.gffpdf-badge--error {
+	background: #fef2f2;
+	color: var(--fp-red);
+}
+
+.gffpdf-badge--success {
+	background: #ecfdf5;
+	color: var(--fp-green);
+}
+
+.gffpdf-badge--gray {
+	background: var(--fp-gray-100);
+	color: var(--fp-gray-600);
+}
+
+/* Mapping count chip */
+.gffpdf-mapping-chip {
 	display: inline-block;
+	background: var(--fp-blue-lt);
+	color: var(--fp-blue);
+	font-size: 12px;
+	font-weight: 600;
+	padding: 3px 10px;
+	border-radius: 20px;
+}
+
+/* Empty state */
+.gffpdf-empty-state {
+	text-align: center;
+	padding: 60px 20px;
+	background: #fff;
+	border: 1px solid var(--fp-gray-200);
+	border-radius: var(--fp-radius);
+	box-shadow: var(--fp-shadow-sm);
+}
+
+.gffpdf-empty-state .dashicons {
+	font-size: 48px;
+	width: 48px;
+	height: 48px;
+	color: var(--fp-gray-400);
+	display: block;
+	margin: 0 auto 16px;
+}
+
+.gffpdf-empty-state p {
+	color: var(--fp-gray-600);
+	font-size: 14px;
+	margin: 0;
+}
+
+/* ── Toggle switch ──────────────────────────────────────────────── */
+.gffpdf-toggle {
+	position: relative;
+	display: inline-block;
+	width: 38px;
+	height: 22px;
+	flex-shrink: 0;
+}
+
+.gffpdf-toggle input {
+	opacity: 0;
+	width: 0;
+	height: 0;
+}
+
+.gffpdf-toggle-slider {
+	position: absolute;
+	inset: 0;
+	background: var(--fp-gray-200);
+	border-radius: 11px;
+	cursor: pointer;
+	transition: .2s;
+}
+
+.gffpdf-toggle-slider::before {
+	content: '';
+	position: absolute;
+	left: 3px;
+	top: 3px;
 	width: 16px;
 	height: 16px;
-	border: 2px solid #c3c4c7;
-	border-top-color: #2271b1;
+	background: #fff;
 	border-radius: 50%;
-	animation: gffpdf-spin .7s linear infinite;
-	vertical-align: middle;
-	margin-left: .5rem;
-}
-@keyframes gffpdf-spin { to { transform: rotate(360deg); } }
-
-/* required marker */
-.required { color: #d63638; }
-/* =========================================================================
-   Inline feed editor (replaces modal)
-   ========================================================================= */
-
-/* Fade the feed list while editor is open */
-#gffpdf-feed-list-wrap {
-	transition: opacity 0.2s;
+	transition: .2s;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, .2);
 }
 
-/* Editor header bar */
+.gffpdf-toggle input:checked+.gffpdf-toggle-slider {
+	background: var(--fp-blue);
+}
+
+.gffpdf-toggle input:checked+.gffpdf-toggle-slider::before {
+	transform: translateX(16px);
+}
+
+/* ── Editor card ────────────────────────────────────────────────── */
+#gffpdf-editor {
+	background: #fff;
+	border: 1px solid var(--fp-gray-200);
+	border-radius: var(--fp-radius-lg);
+	box-shadow: var(--fp-shadow);
+	overflow: hidden;
+}
+
 .gffpdf-editor-header {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	padding: 14px 20px;
-	border-bottom: 1px solid #c3c4c7;
-	background: #f6f7f7;
-	border-radius: 6px 6px 0 0;
+	padding: 18px 24px;
+	background: var(--fp-gray-50);
+	border-bottom: 1px solid var(--fp-gray-200);
+}
+
+.gffpdf-editor-header-left {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+}
+
+.gffpdf-editor-back-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	background: none;
+	border: 1px solid var(--fp-gray-200);
+	border-radius: var(--fp-radius-sm);
+	padding: 6px 12px;
+	font-size: 13px;
+	color: var(--fp-gray-600);
+	cursor: pointer;
+	transition: var(--fp-transition);
+	font-weight: 500;
+}
+
+.gffpdf-editor-back-btn:hover {
+	background: var(--fp-gray-100);
+	color: var(--fp-gray-800);
+	border-color: var(--fp-gray-400);
+}
+
+.gffpdf-editor-back-btn svg {
+	width: 14px;
+	height: 14px;
 }
 
 .gffpdf-editor-header h2 {
 	margin: 0;
 	font-size: 1.1rem;
+	font-weight: 700;
+	color: var(--fp-gray-800);
 }
 
-.gffpdf-editor-header .button{
-	background-color: #366e92;
-	color: #fff;
-	transition: 0.6s ease;
+.gffpdf-editor-body {
+	padding: 28px 28px 8px;
 }
 
-.gffpdf-editor-header .button:hover{
-	border: 1px solid #366e92;
-	color: #366e92;
+/* ── Sections ───────────────────────────────────────────────────── */
+.gffpdf-section {
+	background: #fff;
+	border: 1px solid var(--fp-gray-200);
+	border-radius: var(--fp-radius);
+	margin-bottom: 20px;
+	overflow: hidden;
 }
 
-/* Editor footer */
+.gffpdf-section-head {
+	padding: 14px 20px;
+	background: var(--fp-gray-50);
+	border-bottom: 1px solid var(--fp-gray-200);
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+.gffpdf-section-icon {
+	width: 28px;
+	height: 28px;
+	border-radius: 7px;
+	background: var(--fp-blue-lt);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 14px;
+	flex-shrink: 0;
+}
+
+.gffpdf-section-head h3 {
+	margin: 0;
+	font-size: 13.5px;
+	font-weight: 700;
+	color: var(--fp-gray-800);
+	letter-spacing: .01em;
+}
+
+.gffpdf-section-head .gffpdf-section-desc {
+	margin-left: auto;
+	font-size: 12px;
+	color: var(--fp-gray-400);
+	font-weight: 400;
+}
+
+.gffpdf-section-body {
+	padding: 20px;
+}
+
+/* ── Field rows ─────────────────────────────────────────────────── */
+.gffpdf-field-row {
+	margin-bottom: 18px;
+}
+
+.gffpdf-field-row:last-child {
+	margin-bottom: 0;
+}
+
+.gffpdf-field-row>label {
+	display: block;
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--fp-gray-800);
+	margin-bottom: 6px;
+}
+
+.gffpdf-field-row .description {
+	color: var(--fp-gray-400);
+	font-size: 12px;
+	margin-top: 5px;
+	line-height: 1.5;
+}
+
+.gffpdf-field-row input[type="text"],
+.gffpdf-field-row input[type="number"],
+.gffpdf-field-row select {
+	border: 1px solid var(--fp-gray-200);
+	border-radius: var(--fp-radius-sm);
+	padding: 8px 12px;
+	font-size: 13.5px;
+	color: var(--fp-gray-800);
+	background: #fff;
+	transition: var(--fp-transition);
+	box-shadow: 0 1px 2px rgba(0, 0, 0, .04);
+}
+
+.gffpdf-field-row input[type="text"]:focus,
+.gffpdf-field-row input[type="number"]:focus,
+.gffpdf-field-row select:focus {
+	border-color: var(--fp-blue);
+	box-shadow: 0 0 0 3px rgba(37, 99, 235, .12);
+	outline: none;
+}
+
+.gffpdf-field-row input.regular-text {
+	width: 100%;
+	max-width: 480px;
+}
+
+.gffpdf-field-row select {
+	min-width: 220px;
+}
+
+.gffpdf-field-row--inline {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+}
+
+.gffpdf-field-row--inline>label {
+	margin-bottom: 0;
+}
+
+.gffpdf-field-row--inline .description {
+	margin-left: 0;
+}
+
+/* required */
+.required {
+	color: var(--fp-red);
+}
+
+/* ── Shortcode box ──────────────────────────────────────────────── */
+.gffpdf-shortcode-box {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	background: var(--fp-gray-100);
+	border: 1px solid var(--fp-gray-200);
+	border-radius: var(--fp-radius-sm);
+	padding: 8px 12px;
+	max-width: 500px;
+}
+
+.gffpdf-shortcode-box code {
+	flex: 1;
+	font-size: 12.5px;
+	background: none;
+	color: var(--fp-blue);
+	font-weight: 600;
+}
+
+/* ── Upload area ────────────────────────────────────────────────── */
+.gffpdf-upload-area {
+	border: 2px dashed var(--fp-gray-200);
+	border-radius: var(--fp-radius);
+	padding: 20px;
+	background: var(--fp-gray-50);
+	transition: var(--fp-transition);
+	display: flex;
+	align-items: center;
+	gap: 14px;
+	flex-wrap: wrap;
+}
+
+.gffpdf-upload-area:hover {
+	border-color: var(--fp-blue);
+	background: var(--fp-blue-lt);
+}
+
+.gffpdf-upload-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	background: #fff;
+	border: 1px solid var(--fp-gray-200);
+	border-radius: var(--fp-radius-sm);
+	padding: 8px 16px;
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--fp-gray-800);
+	cursor: pointer;
+	transition: var(--fp-transition);
+	box-shadow: var(--fp-shadow-sm);
+}
+
+.gffpdf-upload-btn:hover {
+	border-color: var(--fp-blue);
+	color: var(--fp-blue);
+	background: var(--fp-blue-lt);
+}
+
+.gffpdf-upload-status {
+	font-size: 13px;
+	color: var(--fp-gray-600);
+	font-style: italic;
+}
+
+.gffpdf-upload-status.success {
+	color: var(--fp-green);
+	font-style: normal;
+	font-weight: 600;
+}
+
+.gffpdf-upload-status.error {
+	color: var(--fp-red);
+	font-style: normal;
+	font-weight: 600;
+}
+
+/* ── Notifications ──────────────────────────────────────────────── */
+.gffpdf-notifications-list {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px;
+}
+
+.gffpdf-notification-item {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	background: var(--fp-gray-50);
+	border: 1.5px solid var(--fp-gray-200);
+	border-radius: var(--fp-radius-sm);
+	padding: 9px 14px;
+	cursor: pointer;
+	transition: var(--fp-transition);
+	font-size: 13px;
+	font-weight: 500;
+	color: var(--fp-gray-800);
+}
+
+.gffpdf-notification-item:hover {
+	border-color: var(--fp-blue);
+	background: var(--fp-blue-lt);
+}
+
+.gffpdf-notification-item input[type="checkbox"] {
+	accent-color: var(--fp-blue);
+	width: 15px;
+	height: 15px;
+}
+
+/* ── Typography section: 2-col grid ─────────────────────────────── */
+.gffpdf-typo-grid {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 16px;
+}
+
+@media (max-width: 700px) {
+	.gffpdf-typo-grid {
+		grid-template-columns: 1fr;
+	}
+}
+
+/* color row */
+.gffpdf-color-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.gffpdf-color-row input[type="color"] {
+	width: 36px;
+	height: 36px;
+	border: 1px solid var(--fp-gray-200);
+	border-radius: var(--fp-radius-sm);
+	padding: 2px;
+	cursor: pointer;
+	background: none;
+}
+
+.gffpdf-color-row input[type="text"] {
+	width: 90px !important;
+}
+
+.gffpdf-btn-clear {
+	background: none;
+	border: 1px solid var(--fp-gray-200);
+	border-radius: var(--fp-radius-sm);
+	padding: 6px 10px;
+	font-size: 12px;
+	color: var(--fp-gray-600);
+	cursor: pointer;
+	transition: var(--fp-transition);
+	white-space: nowrap;
+}
+
+.gffpdf-btn-clear:hover {
+	border-color: var(--fp-red);
+	color: var(--fp-red);
+}
+
+/* ── Conditional logic ──────────────────────────────────────────── */
+#gffpdf-cl-settings {
+	margin-top: 16px;
+	background: var(--fp-gray-50);
+	border: 1px solid var(--fp-gray-200);
+	border-radius: var(--fp-radius-sm);
+	padding: 16px;
+}
+
+/* ── Mapping table ──────────────────────────────────────────────── */
+.gffpdf-table-scroll-container {
+	max-height: 600px;
+	overflow-y: auto !important;
+	overflow-x: visible !important;
+	position: relative;
+	border: 1px solid #ccd0d4;
+	border-radius: 6px;
+	margin-top: 20px;
+}
+
+.gffpdf-mapping-table {
+	width: 100%;
+	border-collapse: separate !important;
+	border-spacing: 0;
+	border: none !important;
+}
+
+#gffpdf-mappings-section .gffpdf-mapping-table thead th {
+	position: -webkit-sticky !important;
+	position: sticky !important;
+	top: 0 !important;
+	background-color: #f6f7f7 !important;
+	z-index: 10 !important;
+	box-shadow: inset 0 -1px 0 #ccd0d4;
+}
+
+.gffpdf-mapping-table td {
+	padding: 8px 14px !important;
+}
+
+.gffpdf-mapping-table select {
+	width: 100%;
+}
+
+.gffpdf-mapping-table .pdf-field-name {
+	font-family: monospace;
+	font-size: 12.5px;
+	color: var(--fp-blue);
+}
+
+/* ── Auto-map btn ───────────────────────────────────────────────── */
+.gffpdf-btn-auto {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	background: var(--fp-gray-100);
+	border: 1px solid var(--fp-gray-200);
+	border-radius: var(--fp-radius-sm);
+	padding: 7px 14px;
+	font-size: 13px;
+	font-weight: 600;
+	cursor: pointer;
+	transition: var(--fp-transition);
+	color: var(--fp-gray-800);
+}
+
+.gffpdf-btn-auto:hover {
+	background: var(--fp-blue-lt);
+	border-color: var(--fp-blue);
+	color: var(--fp-blue);
+}
+
+/* ── Editor footer ──────────────────────────────────────────────── */
 .gffpdf-editor-footer {
-	padding: 20px 24px;
-	border: 1px solid #c3c4c7;
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 18px 28px;
+	background: var(--fp-gray-50);
+	border-top: 1px solid var(--fp-gray-200);
+	position: sticky;
+	bottom: 0;
+	z-index: 10;
+}
+
+.gffpdf-btn-save {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	background: var(--fp-blue);
+	color: #fff !important;
+	border: none;
+	border-radius: var(--fp-radius-sm);
+	padding: 10px 24px;
+	font-size: 13.5px;
+	font-weight: 700;
+	cursor: pointer;
+	transition: var(--fp-transition);
+	box-shadow: 0 2px 6px rgba(37, 99, 235, .3);
+	letter-spacing: .01em;
+}
+
+.gffpdf-btn-save:hover:not(:disabled) {
+	background: var(--fp-blue-dk);
+	transform: translateY(-1px);
+	box-shadow: 0 4px 12px rgba(37, 99, 235, .4);
+}
+
+.gffpdf-btn-save:disabled {
+	opacity: .6;
+	cursor: not-allowed;
+	transform: none;
+}
+
+.gffpdf-btn-cancel-footer {
+	background: none;
+	border: 1px solid var(--fp-gray-200);
+	border-radius: var(--fp-radius-sm);
+	padding: 10px 18px;
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--fp-gray-600);
+	cursor: pointer;
+	transition: var(--fp-transition);
+}
+
+.gffpdf-btn-cancel-footer:hover {
+	border-color: var(--fp-gray-400);
+	color: var(--fp-gray-800);
+	background: var(--fp-gray-100);
+}
+
+/* ── Spinner ─────────────────────────────────────────────────────── */
+.gffpdf-spinner {
+	display: inline-block;
+	width: 14px;
+	height: 14px;
+	border: 2px solid rgba(255, 255, 255, .4);
+	border-top-color: #fff;
+	border-radius: 50%;
+	animation: fp-spin .7s linear infinite;
+	vertical-align: middle;
+}
+
+@keyframes fp-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+/* ── WordPress admin overrides ──────────────────────────────────────── */
+.gffpdf-wrap h1.wp-heading-inline {
+	display: none;
+}
+
+.gffpdf-wrap .page-title-action {
+	display: none;
+}
+
+/* ── Conditional logic rule rows ─────────────────────────────────────── */
+.gffpdf-cl-rule {
 	display: flex;
 	gap: 8px;
-	background: #fff;;
-	margin-top: 20px;
+	align-items: center;
+	margin-bottom: 8px;
+	flex-wrap: wrap;
 }
 
-.gffpdf-editor-footer .button{
-	background-color: #366e92;
-	color: #fff;
-	transition: 0.6s ease;
+.gffpdf-cl-rule select,
+.gffpdf-cl-rule input {
+	border: 1px solid #e5e7eb;
+	border-radius: 6px;
+	padding: 6px 10px;
+	font-size: 13px;
 }
 
-.gffpdf-editor-footer .button:hover{
-	border: 1px solid #366e92;
-	color: #366e92;
+.gffpdf-cl-rule .gffpdf-remove-rule {
+	background: none;
+	border: none;
+	color: #dc2626;
+	cursor: pointer;
+	font-size: 16px;
+	padding: 0 4px;
+	line-height: 1;
+	transition: opacity .15s;
 }
 
-.gffpdf-section{
-	background-color: #fff;
-	border: 1px solid #c3c4c7;
-	padding: 20px 24px;
-	margin-top: 20px;
-	border-radius: 4px;
-	box-shadow: 0 2px 8px rgba(0, 0, 0, .08);
+.gffpdf-cl-rule .gffpdf-remove-rule:hover {
+	opacity: .7;
 }
 
-/* Collapsible section toggle */
-.gffpdf-section-toggle-header {
-	user-select: none;
-}
-.gffpdf-section-toggle-header:hover h2,
-.gffpdf-section-toggle-header:hover h3 {
-	color: #2271b1;
-}
-.gffpdf-toggle-arrow {
-	font-size: 11px;
-	color: #2271b1;
-	min-width: 12px;
-}
-
-/* Fonts partial panels inside editor */
-.gffpdf-fonts-partial .gffpdf-settings-panel {
-	border: 1px solid #e0e0e0;
-	border-radius: 4px;
-	padding: 16px;
-	background: #fafafa;
-}
-
-/* Remove old modal rules that are no longer needed */
-.gffpdf-modal,
-.gffpdf-modal-backdrop,
-.gffpdf-modal-dialog,
-.gffpdf-modal-header,
-.gffpdf-modal-body,
-.gffpdf-modal-footer,
-.gffpdf-modal-close {
-	display: none !important;
-}
-
-.gffpdf-table-scroll-container{
-	max-height: 600px; 
-	overflow-y: auto; 
-	border: 1px solid #ccc; 
-	margin-top: 15px;
+.gffpdf-cl-value-select {
+	width: 150px;
 }
