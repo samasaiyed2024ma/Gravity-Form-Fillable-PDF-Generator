@@ -90,7 +90,7 @@ class GFFPDF_Admin_Menu {
 		echo '<h1>' . esc_html__('Manage Fonts', 'gf-fillable-pdf') . '</h1>';
 		echo '<p>' . esc_html__( 'Upload custom fonts (.ttf or .otf) for use in PDF generation. Built-in fonts are always available.', 'gf-fillable-pdf' ) . '</p>';
 
-		// Upload form
+		// Upload font
 		echo '<div class="gffpdf-settings-panel" style="max-width:700px;">';
 		echo '<h2>' . esc_html__( 'Upload Custom Font', 'gf-fillable-pdf' ) . '</h2>';
 		echo '<table class="form-table"><tbody>';
@@ -307,7 +307,6 @@ class GFFPDF_Admin_Menu {
 				$.ajax({
 					url:      $btn.data('ajax-url'),
 					type:     'POST',
-					dataType: 'json',
 					data: {
 						action:   'gffpdf_regenerate',
 						entry_id: $btn.data('entry-id'),
@@ -320,34 +319,33 @@ class GFFPDF_Admin_Menu {
 							.css({ background: '#ecfdf5', color: '#065f46', border: '1px solid #a7f3d0', padding: '8px 12px', borderRadius: '4px', fontSize: '13px', marginBottom: '8px' })
 							.text(res.data.message)
 							.show();
-						setTimeout(function(){ location.reload(); }, 1500);
+						var reloadDelay = (res.data && res.data.async) ? 5000 : 1500;
+						setTimeout(function(){ location.reload(); }, reloadDelay);
 					} else {
-						var msg = (res && res.data && res.data.message)
-							? res.data.message
-							: '<?php echo esc_js( __( 'PDF generation failed. Please check your feed settings.', 'gf-fillable-pdf' ) ); ?>';
+						var msg = (res && res.data && res.data.message) 
+						? res.data.message 
+						: '<?php echo esc_js( __( 'PDF generation failed. Please check your feed settings.', 'gf-fillable-pdf' ) ); ?>';
 						$notice
-							.css({ background: '#fef2f2', color: '#991b1b', border: '1px solid #fca5a5', padding: '8px 12px', borderRadius: '4px', fontSize: '13px', marginBottom: '8px' })
+							.css({ background: '#fef2f2', color: '#991b1b', border: '1px solid #fca5a5', padding: '8px 12px', borderRadius: '4px', fontSize: '13px', marginBottom: '8px', whiteSpace: 'pre-wrap', wordBreak: 'break-word' })
 							.text(msg)
 							.show();
 						$btn.prop('disabled', false).text(originalText);
 					}
 				})
-				.fail(function(xhr, status, error){
+				.fail(function(xhr){
 					// Try to parse a JSON body from the error response
-					var msg = '<?php echo esc_js( __( 'Request failed. Please refresh the page and try again.', 'gf-fillable-pdf' ) ); ?>';
+					var msg;
 					try {
-						var body = JSON.parse(xhr.responseText);
-						if (body && body.data && body.data.message) {
-							msg = body.data.message;
-						}
+						var res = JSON.parse(xhr.responseText);
+						msg = (res && res.data && res.data.message) ? res.data.message : 'Server error.';
 					} catch(e) {
-						// If we can't parse JSON, include the HTTP status to help debug
-						if (xhr.status) {
-							msg = 'HTTP ' + xhr.status + ': ' + msg;
-						}
+												// If we can't parse JSON, include the HTTP status to help debug
+						msg = xhr.responseText
+							? xhr.responseText.replace(/<[^>]+>/g, '').trim().substring(0, 500)
+							: 'No response received. Check your server error logs.';
 					}
 					$notice
-						.css({ background: '#fef2f2', color: '#991b1b', border: '1px solid #fca5a5', padding: '8px 12px', borderRadius: '4px', fontSize: '13px', marginBottom: '8px' })
+						.css({ background: '#fef2f2', color: '#991b1b', border: '1px solid #fca5a5', padding: '8px 12px', borderRadius: '4px', fontSize: '13px', marginBottom: '8px', whiteSpace: 'pre-wrap', wordBreak: 'break-word' })
 						.text(msg)
 						.show();
 					$btn.prop('disabled', false).text(originalText);
