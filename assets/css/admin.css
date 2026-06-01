@@ -135,6 +135,10 @@
     box-shadow: 0 4px 12px rgba(37, 99, 235, .35);
 }
 
+.form-table th{
+	font-size: 13px !important;
+}
+
 /* ── Log viewer ──────────────────────────────────────────────────────── */
 .gffpdf-log-viewer {
 	max-height: 400px;
