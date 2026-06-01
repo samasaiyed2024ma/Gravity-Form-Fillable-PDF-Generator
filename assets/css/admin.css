@@ -13,6 +13,18 @@
 	--gffpdf-bg: #f6f7f7;
 	--gffpdf-radius: 4px;
 	--gffpdf-shadow: 0 1px 3px rgba(0, 0, 0, .12);
+	--fp-gray-50: #f9fafb;
+	--fp-gray-100: #f3f4f6;
+	--fp-gray-200: #e5e7eb;
+	--fp-gray-400: #9ca3af;
+	--fp-gray-600: #4b5563;
+	--fp-gray-800: #1f2937;
+	--fp-radius-sm: 6px;
+	--fp-radius: 10px;
+	--fp-radius-lg: 14px;
+	--fp-shadow-sm: 0 1px 3px rgba(0, 0, 0, .08), 0 1px 2px rgba(0, 0, 0, .06);
+	--fp-shadow: 0 4px 16px rgba(0, 0, 0, .10);
+	--fp-transition: all .2s cubic-bezier(.4, 0, .2, 1);
 }
 
 /* ── Wrap ───────────────────────────────────────────────────────────────── */
@@ -82,26 +94,45 @@
 /* ── Settings container ──────────────────────────────────────────────── */
 .gffpdf-settings-container {
 	max-width: 900px;
+	background: #fff;
+    border: 1px solid var(--fp-gray-200);
+    border-radius: var(--fp-radius-lg);
+    box-shadow: var(--fp-shadow);
+    overflow: hidden;
+	padding: 28px 28px 8px;
 }
 
 .gffpdf-settings-panel,
 .gffpdf-logs-panel {
 	background: #fff;
-	border: 1px solid var(--gffpdf-border);
-	border-radius: var(--gffpdf-radius);
-	padding: 1.5rem;
-	margin-bottom: 1.5rem;
-	box-shadow: var(--gffpdf-shadow);
+    border: 1px solid var(--fp-gray-200);
+    border-radius: var(--fp-radius);
+    margin-bottom: 20px;
+    overflow: hidden;
 }
 
-.gffpdf-settings-panel h2,
-.gffpdf-logs-panel h2 {
-	margin-top: 0;
+.gffpdf-section-head {
+	padding: 0px 20px;
+    background: var(--fp-gray-50);
+    border-bottom: 1px solid var(--fp-gray-200);
+    display: flex;
+    align-items: center;
+    gap: 10px;
 }
 
-#gffpdf-save-settings {
-	background-color: #1558a0 !important;
-	color: #fff;
+.gffpdf-section-body {
+	padding: 20px;
+}
+
+#gffpdf-save-settings{
+	background-color: #3858e9;
+	transition: var(--fp-transition);
+}
+
+#gffpdf-save-settings:hover {
+    background: #3858e9;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, .35);
 }
 
 /* ── Log viewer ──────────────────────────────────────────────────────── */
@@ -215,4 +246,29 @@
 	display: block;
 	margin: 0 auto .75rem;
 	color: var(--gffpdf-border);
+}
+
+#gffpdf-font-upload-btn-inline{
+	background-color: #3858e9;
+	transition: var(--fp-transition);
+}
+
+#gffpdf-font-upload-btn-inline:hover {
+    background: #3858e9;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, .35);
+}
+
+.gffpdf-delete-font-inline{
+	background-color: #d63638 !important; 
+	color: #fff !important;
+	border: none !important;
+	height: 35px !important;
+	line-height: 1em !important;
+	padding: 0 12px !important;
+	transition: 0.6s ease;
+}
+
+.gffpdf-delete-font-inline:hover{
+	background-color: #c52528 !important;
 }
