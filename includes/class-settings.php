@@ -14,14 +14,14 @@ class GFFPDF_Settings {
 	public function add_settings_menu( array $menu ): array {
 		$menu[] = [
 			'name'  => 'gffpdf',
-			'label' => __( 'Fillable PDF Generator', 'gf-fillable-pdf' ),
+			'label' => __( 'Fillable PDF Generator', 'gf-fillable-pdf-generator' ),
 		];
 		return $menu;
 	}
 
 	public function render_settings_page(): void {
 		if ( ! GFFPDF_Security::current_user_can() ) {
-			wp_die( esc_html__( 'Permission denied.', 'gf-fillable-pdf' ) );
+			wp_die( esc_html__( 'Permission denied.', 'gf-fillable-pdf-generator' ) );
 		}
 
 		$settings = self::get_settings();
@@ -53,17 +53,18 @@ class GFFPDF_Settings {
 
 	public function ajax_save_settings(): void {
 		GFFPDF_Security::check_ajax();
-
-		$raw = $_POST['settings'] ?? [];
+		
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Nonce is verified inside GFFPDF_Security::check_ajax()
+		$raw = isset( $_POST['settings'] ) ? wp_unslash( $_POST['settings'] ) : [];
 		if ( ! is_array( $raw ) ) {
-			wp_send_json_error( [ 'message' => __( 'Invalid data.', 'gf-fillable-pdf' ) ] );
+			wp_send_json_error( [ 'message' => __( 'Invalid data.', 'gf-fillable-pdf-generator' ) ] );
 		}
 
 		$clean = GFFPDF_Security::sanitize_settings( $raw );
 		update_option( 'gffpdf_settings', $clean );
 
 		GFFPDF_Logger::info( 'Global settings saved' );
-		wp_send_json_success( [ 'message' => __( 'Settings saved.', 'gf-fillable-pdf' ) ] );
+		wp_send_json_success( [ 'message' => __( 'Settings saved.', 'gf-fillable-pdf-generator' ) ] );
 	}
 
 	public function ajax_clear_logs(): void {
@@ -71,9 +72,9 @@ class GFFPDF_Settings {
 
 		$files = GFFPDF_Logger::list_log_files();
 		foreach ( $files as $file ) {
-			unlink( $file );
+			wp_delete_file( $file );
 		}
-		wp_send_json_success( [ 'message' => __( 'Logs cleared.', 'gf-fillable-pdf' ) ] );
+		wp_send_json_success( [ 'message' => __( 'Logs cleared.', 'gf-fillable-pdf-generator' ) ] );
 	}
 
 	/* -----------------------------------------------------------------------

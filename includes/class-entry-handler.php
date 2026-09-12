@@ -54,7 +54,8 @@ class GFFPDF_Entry_Handler {
 		if ( empty( $template_path ) || ! file_exists( $template_path ) ) {
 			GFFPDF_Logger::error( 'Template file missing', [ 'feed_id' => $feed_id, 'path' => $template_path ] );
 			return new WP_Error( 'template_missing',
-				sprintf( __( 'Feed "%s": PDF template file is missing or has not been uploaded.', 'gf-fillable-pdf' ), $feed->feed_name )
+				// translators: %s: The name of the feed config.
+				sprintf( __( 'Feed "%s": PDF template file is missing or has not been uploaded.', 'gf-fillable-pdf-generator' ), $feed->feed_name )
 			);
 		}
 
@@ -66,7 +67,8 @@ class GFFPDF_Entry_Handler {
 		if ( empty( $active_mappings ) ) {
 			GFFPDF_Logger::warn( 'No field mappings configured', [ 'feed_id' => $feed_id ] );
 			return new WP_Error( 'no_mappings',
-				sprintf( __( 'Feed "%s": no field mappings configured — please map at least one PDF field to a form field.', 'gf-fillable-pdf' ), $feed->feed_name )
+				// translators: %s: The name of the feed config.
+				sprintf( __( 'Feed "%s": no field mappings configured — please map at least one PDF field to a form field.', 'gf-fillable-pdf-generator' ), $feed->feed_name )
 			);
 		}
 
@@ -74,7 +76,8 @@ class GFFPDF_Entry_Handler {
 		if ( ! $this->passes_conditional_logic( $settings, $entry, $form ) ) {
 			GFFPDF_Logger::info( 'Feed skipped: conditional logic', [ 'feed_id' => $feed_id, 'entry_id' => $entry['id'] ] );
 			return new WP_Error( 'conditional_logic',
-				sprintf( __( 'Feed "%s": skipped — conditional logic rules not met for this entry.', 'gf-fillable-pdf' ), $feed->feed_name )
+				// translators: %s: The name of the feed config.
+				sprintf( __( 'Feed "%s": skipped — conditional logic rules not met for this entry.', 'gf-fillable-pdf-generator' ), $feed->feed_name )
 			);
 		}
 
@@ -346,26 +349,26 @@ class GFFPDF_Entry_Handler {
 
 		if ( ! $entry_id ) {
 			ob_end_clean();
-			wp_send_json_error( [ 'message' => esc_html__( 'Invalid entry ID.', 'gf-fillable-pdf' ) ], 400 );
+			wp_send_json_error( [ 'message' => esc_html__( 'Invalid entry ID.', 'gf-fillable-pdf-generator' ) ], 400 );
 			return;
 		}
 
 		if ( ! GFFPDF_Security::verify_nonce( $nonce, 'gffpdf_regenerate_' . $entry_id ) ) {
 			ob_end_clean();
-			wp_send_json_error( [ 'message' => esc_html__( 'Security check failed. Please refresh the page and try again.', 'gf-fillable-pdf' ) ], 403 );
+			wp_send_json_error( [ 'message' => esc_html__( 'Security check failed. Please refresh the page and try again.', 'gf-fillable-pdf-generator' ) ], 403 );
 			return;
 		}
 
 		if ( ! GFFPDF_Security::current_user_can() ) {
 			ob_end_clean();
-			wp_send_json_error( [ 'message' => esc_html__( 'Permission denied.', 'gf-fillable-pdf' ) ], 403 );
+			wp_send_json_error( [ 'message' => esc_html__( 'Permission denied.', 'gf-fillable-pdf-generator' ) ], 403 );
 			return;
 		}
 
 		$entry = GFAPI::get_entry( $entry_id );
 		if ( is_wp_error( $entry ) ) {
 			ob_end_clean();
-			wp_send_json_error( [ 'message' => esc_html__( 'Entry not found.', 'gf-fillable-pdf' ) ], 400 );
+			wp_send_json_error( [ 'message' => esc_html__( 'Entry not found.', 'gf-fillable-pdf-generator' ) ], 400 );
 			return;
 		}
 
@@ -374,7 +377,7 @@ class GFFPDF_Entry_Handler {
 
 		if ( empty( $feeds ) ) {
 			ob_end_clean();
-			wp_send_json_error( [ 'message' => esc_html__( 'No active feeds found for this form. Please create and activate a feed first.', 'gf-fillable-pdf' ) ], 400 );
+			wp_send_json_error( [ 'message' => esc_html__( 'No active feeds found for this form. Please create and activate a feed first.', 'gf-fillable-pdf-generator' ) ], 400 );
 			return;
 		}
 
@@ -397,7 +400,7 @@ class GFFPDF_Entry_Handler {
 
 		if ( $generated === 0 && empty( $errors ) ) {
 			ob_end_clean();
-			wp_send_json_error( [ 'message' => esc_html__( 'All feeds were skipped — conditional logic rules were not met for this entry.', 'gf-fillable-pdf' ) ], 400 );
+			wp_send_json_error( [ 'message' => esc_html__( 'All feeds were skipped — conditional logic rules were not met for this entry.', 'gf-fillable-pdf-generator' ) ], 400 );
 			return;
 		}
 
@@ -408,12 +411,13 @@ class GFFPDF_Entry_Handler {
 		}
 
 		$success_msg = sprintf(
-			_n( '%d PDF generated successfully.', '%d PDFs generated successfully.', $generated, 'gf-fillable-pdf' ),
+			// translators: %d: The number of PDFs generated.
+			_n( '%d PDF generated successfully.', '%d PDFs generated successfully.', $generated, 'gf-fillable-pdf-generator' ),
 			$generated
 		);
 
 		if ( ! empty( $errors ) ) {
-			$success_msg .= ' ' . esc_html__( 'Warning:', 'gf-fillable-pdf' ) . ' ' . implode( ' | ', $errors );
+			$success_msg .= ' ' . esc_html__( 'Warning:', 'gf-fillable-pdf-generator' ) . ' ' . implode( ' | ', $errors );
 		}
 
 		ob_end_clean();

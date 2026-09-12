@@ -39,7 +39,7 @@ class GFFPDF_Security {
 
 	public static function require_capability(): void {
 		if ( ! self::current_user_can() ) {
-			wp_die( esc_html__( 'You do not have permission to perform this action.', 'gf-fillable-pdf' ), 403 );
+			wp_die( esc_html__( 'You do not have permission to perform this action.', 'gf-fillable-pdf-generator' ), 403 );
 		}
 	}
 
@@ -61,10 +61,10 @@ class GFFPDF_Security {
 	public static function check_ajax( string $action = self::NONCE_AJAX ): void {
 		$nonce = isset( $_POST['nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['nonce'] ) ) : '';
 		if ( ! self::verify_nonce( $nonce, $action ) ) {
-			wp_send_json_error( [ 'message' => esc_html__( 'Security check failed.', 'gf-fillable-pdf' ) ], 403 );
+			wp_send_json_error( [ 'message' => esc_html__( 'Security check failed.', 'gf-fillable-pdf-generator' ) ], 403 );
 		}
 		if ( ! self::current_user_can() ) {
-			wp_send_json_error( [ 'message' => esc_html__( 'Permission denied.', 'gf-fillable-pdf' ) ], 403 );
+			wp_send_json_error( [ 'message' => esc_html__( 'Permission denied.', 'gf-fillable-pdf-generator' ) ], 403 );
 		}
 	}
 
@@ -93,7 +93,7 @@ class GFFPDF_Security {
 		// Sanitize notification IDs(array of integers)
 		$notification_ids = [];
 		if(!empty($settings['notification_ids']) && is_array($settings['notification_ids'])){
-			$notification_ids = array_map('sanitize_text_field', $settings['notification_ids']);
+			$notification_ids = array_map('absint', $settings['notification_ids']);
 		}
 
 		// Sanitize conditional logic rules
@@ -169,7 +169,7 @@ class GFFPDF_Security {
 				'file_too_large',
 				sprintf(
 					/* translators: %s: max allowed file size */
-					esc_html__( 'File exceeds maximum allowed size of %s.', 'gf-fillable-pdf' ),
+					esc_html__( 'File exceeds maximum allowed size of %s.', 'gf-fillable-pdf-generator' ),
 					GFFPDF_Helpers::format_bytes( $max_size )
 				)
 			);
@@ -178,7 +178,7 @@ class GFFPDF_Security {
 		// Extension
 		$ext = strtolower( pathinfo( $file['name'], PATHINFO_EXTENSION ) );
 		if ( $ext !== 'pdf' ) {
-			return new WP_Error( 'invalid_extension', esc_html__( 'Only PDF files are allowed.', 'gf-fillable-pdf' ) );
+			return new WP_Error( 'invalid_extension', esc_html__( 'Only PDF files are allowed.', 'gf-fillable-pdf-generator' ) );
 		}
 
 		// MIME
@@ -187,7 +187,7 @@ class GFFPDF_Security {
 		finfo_close( $finfo );
 
 		if ( $mime !== 'application/pdf' ) {
-			return new WP_Error( 'invalid_mime', esc_html__( 'Invalid file type. Only PDF files are accepted.', 'gf-fillable-pdf' ) );
+			return new WP_Error( 'invalid_mime', esc_html__( 'Invalid file type. Only PDF files are accepted.', 'gf-fillable-pdf-generator' ) );
 		}
 
 		return true;

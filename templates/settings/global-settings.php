@@ -1,6 +1,6 @@
 <?php if ( ! defined( 'ABSPATH' ) ) exit; ?>
 <div class="wrap gffpdf-wrap">
-	<h1><?php esc_html_e( 'Fillable PDF Generator — Settings', 'gf-fillable-pdf' ); ?></h1>
+	<h1><?php esc_html_e( 'Fillable PDF Generator — Settings', 'gf-fillable-pdf-generator' ); ?></h1>
 
 	<div id="gffpdf-settings-notice" class="gffpdf-notice" style="display:none;"></div>
 
@@ -10,7 +10,7 @@
 		<div class="gffpdf-settings-panel">
 			<div class="gffpdf-section-head">
 				<span class="gffpdf-section-icon">⚙️</span>
-				<h3><?php esc_html_e( 'Global Defaults', 'gf-fillable-pdf' ); ?></h3>
+				<h3><?php esc_html_e( 'Global Defaults', 'gf-fillable-pdf-generator' ); ?></h3>
 			</div>
 
 			<div class="gffpdf-section-body">
@@ -20,7 +20,7 @@
 						<!-- Font Family -->
 						<tr>
 							<th scope="row">
-								<label for="gffpdf-font-family"><?php esc_html_e( 'Default Font Family', 'gf-fillable-pdf' ); ?></label>
+								<label for="gffpdf-font-family"><?php esc_html_e( 'Default Font Family', 'gf-fillable-pdf-generator' ); ?></label>
 							</th>
 							<td>
 								<select id="gffpdf-font-family" name="default_font_family">
@@ -42,7 +42,7 @@
 						<!-- Font Size -->
 						<tr>
 							<th scope="row">
-								<label for="gffpdf-font-size"><?php esc_html_e( 'Default Font Size (pt)', 'gf-fillable-pdf' ); ?></label>
+								<label for="gffpdf-font-size"><?php esc_html_e( 'Default Font Size (pt)', 'gf-fillable-pdf-generator' ); ?></label>
 							</th>
 							<td>
 								<input type="number" id="gffpdf-font-size" name="default_font_size"
@@ -53,7 +53,7 @@
 						<!-- Font Color -->
 						<tr>
 							<th scope="row">
-								<label for="gffpdf-font-color"><?php esc_html_e( 'Default Font Color', 'gf-fillable-pdf' ); ?></label>
+								<label for="gffpdf-font-color"><?php esc_html_e( 'Default Font Color', 'gf-fillable-pdf-generator' ); ?></label>
 							</th>
 							<td>
 								<input type="color" id="gffpdf-font-color" name="default_font_color"
@@ -64,59 +64,59 @@
 						<!-- Filename Pattern -->
 						<tr>
 							<th scope="row">
-								<label for="gffpdf-filename-pattern"><?php esc_html_e( 'Default Filename Pattern', 'gf-fillable-pdf' ); ?></label>
+								<label for="gffpdf-filename-pattern"><?php esc_html_e( 'Default Filename Pattern', 'gf-fillable-pdf-generator' ); ?></label>
 							</th>
 							<td>
 								<input type="text" id="gffpdf-filename-pattern" name="filename_pattern"
 									value="<?php echo esc_attr( $settings['filename_pattern'] ); ?>" class="regular-text">
-								<p class="description"><?php esc_html_e( 'Tags: {entry_id}, {form_id}, {date}, {field:N}', 'gf-fillable-pdf' ); ?></p>
+								<p class="description"><?php esc_html_e( 'Tags: {entry_id}, {form_id}, {date}, {field:N}', 'gf-fillable-pdf-generator' ); ?></p>
 							</td>
 						</tr>
 
 						<!-- Save PDFs -->
 						<tr>
-							<th scope="row"><?php esc_html_e( 'Save Generated PDFs', 'gf-fillable-pdf' ); ?></th>
+							<th scope="row"><?php esc_html_e( 'Save Generated PDFs', 'gf-fillable-pdf-generator' ); ?></th>
 							<td>
 								<label>
 									<input type="checkbox" id="gffpdf-save-pdfs" name="save_pdfs" value="1"
 										<?php checked( $settings['save_pdfs'] ); ?>>
-									<?php esc_html_e( 'Save PDFs to server storage', 'gf-fillable-pdf' ); ?>
+									<?php esc_html_e( 'Save PDFs to server storage', 'gf-fillable-pdf-generator' ); ?>
 								</label>
 							</td>
 						</tr>
 
 						<!-- Flatten PDF -->
-						<tr>
-							<th scope="row"><?php esc_html_e( 'Flatten PDFs', 'gf-fillable-pdf' ); ?></th>
+						<!-- <tr>
+							<th scope="row"><?php esc_html_e( 'Flatten PDFs', 'gf-fillable-pdf-generator' ); ?></th>
 							<td>
 								<label>
 									<input type="checkbox" id="gffpdf-flatten" name="flatten_pdf" value="1"
-										<?php checked( $settings['flatten_pdf'] ); ?>>
-									<?php esc_html_e( 'Flatten after filling (prevents editing)', 'gf-fillable-pdf' ); ?>
+										<?php //checked( $settings['flatten_pdf'] ); ?>>
+									<?php// esc_html_e( 'Flatten after filling (prevents editing)', 'gf-fillable-pdf-generator' ); ?>
 								</label>
 							</td>
-						</tr>
+						</tr> -->
 
 						<!-- RTL Support -->
 						<tr>
-							<th scope="row"><?php esc_html_e( 'RTL Support', 'gf-fillable-pdf' ); ?></th>
+							<th scope="row"><?php esc_html_e( 'RTL Support', 'gf-fillable-pdf-generator' ); ?></th>
 							<td>
 								<label>
 									<input type="checkbox" id="gffpdf-rtl" name="rtl_support" value="1"
 										<?php checked( $settings['rtl_support'] ); ?>>
-									<?php esc_html_e( 'Enable right-to-left text direction', 'gf-fillable-pdf' ); ?>
+									<?php esc_html_e( 'Enable right-to-left text direction', 'gf-fillable-pdf-generator' ); ?>
 								</label>
 							</td>
 						</tr>
 
 						<!-- Enable Logs -->
 						<tr>
-							<th scope="row"><?php esc_html_e( 'Enable Logging', 'gf-fillable-pdf' ); ?></th>
+							<th scope="row"><?php esc_html_e( 'Enable Logging', 'gf-fillable-pdf-generator' ); ?></th>
 							<td>
 								<label>
 									<input type="checkbox" id="gffpdf-logs" name="enable_logs" value="1"
 										<?php checked( $settings['enable_logs'] ); ?>>
-									<?php esc_html_e( 'Write plugin events to log files', 'gf-fillable-pdf' ); ?>
+									<?php esc_html_e( 'Write plugin events to log files', 'gf-fillable-pdf-generator' ); ?>
 								</label>
 							</td>
 						</tr>
@@ -124,12 +124,12 @@
 						<!-- Storage Path -->
 						<tr>
 							<th scope="row">
-								<label for="gffpdf-storage-path"><?php esc_html_e( 'Storage Path', 'gf-fillable-pdf' ); ?></label>
+								<label for="gffpdf-storage-path"><?php esc_html_e( 'Storage Path', 'gf-fillable-pdf-generator' ); ?></label>
 							</th>
 							<td>
 								<input type="text" id="gffpdf-storage-path" name="storage_path"
 									value="<?php echo esc_attr( $settings['storage_path'] ); ?>" class="large-text">
-								<p class="description"><?php esc_html_e( 'Absolute server path for PDF storage. Default is wp-content/uploads/gffpdf/', 'gf-fillable-pdf' ); ?></p>
+								<p class="description"><?php esc_html_e( 'Absolute server path for PDF storage. Default is wp-content/uploads/gffpdf/', 'gf-fillable-pdf-generator' ); ?></p>
 							</td>
 						</tr>
 
@@ -138,7 +138,7 @@
 
 				<p class="submit">
 					<button type="button" id="gffpdf-save-settings" class="button button-primary">
-						<?php esc_html_e( 'Save Settings', 'gf-fillable-pdf' ); ?>
+						<?php esc_html_e( 'Save Settings', 'gf-fillable-pdf-generator' ); ?>
 					</button>
 				</p>
 			</div>
@@ -148,8 +148,8 @@
 		<div class="gffpdf-settings-panel" style="margin-top:24px;">
 			<div class="gffpdf-section-toggle-header gffpdf-section-head" id="gffpdf-global-fonts-toggle" style="cursor:pointer;display:flex;align-items:center;gap:8px;margin-bottom:0;">
 				<span class="gffpdf-toggle-arrow">▶</span>
-				<h2 style="margin:1em 0;"><?php esc_html_e( '🔤 Manage Fonts', 'gf-fillable-pdf' ); ?></h2>
-				<span style="font-size:13px;color:#646970;font-weight:400;"><?php esc_html_e( '(click to expand)', 'gf-fillable-pdf' ); ?></span>
+				<h2 style="margin:1em 0;"><?php esc_html_e( '🔤 Manage Fonts', 'gf-fillable-pdf-generator' ); ?></h2>
+				<span style="font-size:13px;color:#646970;font-weight:400;"><?php esc_html_e( '(click to expand)', 'gf-fillable-pdf-generator' ); ?></span>
 			</div>
 			<!-- <div class="gffpdf-section-body"> -->
 				<div id="gffpdf-global-fonts-body" style="display:none;margin-top:16px;">
@@ -164,18 +164,18 @@
 		<div class="gffpdf-logs-panel">
 			<div class="gffpdf-section-head">
 				<span class="gffpdf-section-icon"></span>
-				<h3><?php esc_html_e( 'Recent Logs', 'gf-fillable-pdf' ); ?></h3>
+				<h3><?php esc_html_e( 'Recent Logs', 'gf-fillable-pdf-generator' ); ?></h3>
 			</div>
 
 			<div class="gffpdf-section-body">
 				<p>
 					<button type="button" id="gffpdf-clear-logs" class="button button-secondary">
-						<?php esc_html_e( 'Clear All Logs', 'gf-fillable-pdf' ); ?>
+						<?php esc_html_e( 'Clear All Logs', 'gf-fillable-pdf-generator' ); ?>
 					</button>
 				</p>
 				<div class="gffpdf-log-viewer">
 					<?php if ( empty( $logs ) ) : ?>
-						<p><?php esc_html_e( 'No log entries yet.', 'gf-fillable-pdf' ); ?></p>
+						<p><?php esc_html_e( 'No log entries yet.', 'gf-fillable-pdf-generator' ); ?></p>
 					<?php else : ?>
 						<pre class="gffpdf-log-pre"><?php echo esc_html( implode( "\n", $logs ) ); ?></pre>
 					<?php endif; ?>

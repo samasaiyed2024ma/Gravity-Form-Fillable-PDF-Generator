@@ -22,7 +22,7 @@ class GFFPDF_PDF_Field_Extractor {
 	 */
 	public function extract( string $pdf_path ) {
 		if ( ! file_exists( $pdf_path ) ) {
-			return new WP_Error( 'file_not_found', esc_html__( 'PDF file not found.', 'gf-fillable-pdf' ) );
+			return new WP_Error( 'file_not_found', esc_html__( 'PDF file not found.', 'gf-fillable-pdf-generator' ) );
 		}
 
 		$fields = $this->parse_fields_from_pdf( $pdf_path );
@@ -32,7 +32,7 @@ class GFFPDF_PDF_Field_Extractor {
 		}
 
 		if ( empty( $fields ) ) {
-			return new WP_Error( 'no_fields', esc_html__( 'No fillable AcroForm fields found in this PDF.', 'gf-fillable-pdf' ) );
+			return new WP_Error( 'no_fields', esc_html__( 'No fillable AcroForm fields found in this PDF.', 'gf-fillable-pdf-generator' ) );
 		}
 
 		// Persist to DB (replace any previous extraction for this template)

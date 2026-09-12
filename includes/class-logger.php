@@ -55,7 +55,7 @@ class GFFPDF_Logger {
 			wp_mkdir_p( $log_dir );
 		}
 
-		self::$log_file = $log_dir . 'gffpdf-' . date( 'Y-m-d' ) . '.log';
+		self::$log_file = $log_dir . 'gffpdf-' . gmdate( 'Y-m-d' ) . '.log';
 		return self::$log_file;
 	}
 
@@ -92,7 +92,7 @@ class GFFPDF_Logger {
 		$cutoff = strtotime( "-{$days} days" );
 		foreach ( $files as $file ) {
 			if ( filemtime( $file ) < $cutoff ) {
-				unlink( $file );
+				wp_delete_file( $file );
 			}
 		}
 	}

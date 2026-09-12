@@ -267,7 +267,7 @@
 	background-color: #d63638 !important; 
 	color: #fff !important;
 	border: none !important;
-	height: 35px !important;
+	height: 30px !important;
 	line-height: 1em !important;
 	padding: 0 12px !important;
 	transition: 0.6s ease;
@@ -276,3 +276,5 @@
 .gffpdf-delete-font-inline:hover{
 	background-color: #c52528 !important;
 }
+
+.

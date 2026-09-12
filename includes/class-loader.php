@@ -24,16 +24,5 @@ class GFFPDF_Loader{
         add_action('rest_api_init', function(){
            (new GFFPDF_REST_API())->register_routes();
         });
-
-        // i18n     
-        add_action('init', [__CLASS__, 'load_textdomain']);
-    }
-
-    public static function load_textdomain(){
-        load_plugin_textdomain(
-            'gf-fillable-pdf',
-            false,
-            dirname(plugin_basename(GFFPDF_PATH . 'gf-fillable-pdf-generator.php')) . '/languages'
-        );
     }
 }

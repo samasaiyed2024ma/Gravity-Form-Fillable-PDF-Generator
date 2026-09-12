@@ -22,7 +22,7 @@ class GFFPDF_PDF_Generator {
 
 	public function generate( string $template_path, array $field_values, array $options = [] ) {
 		if ( ! file_exists( $template_path ) ) {
-			return new WP_Error( 'template_not_found', esc_html__( 'PDF template not found.', 'gf-fillable-pdf' ) );
+			return new WP_Error( 'template_not_found', esc_html__( 'PDF template not found.', 'gf-fillable-pdf-generator' ) );
 		}
 
 		$field_values = $this->normalise_values( $field_values );
@@ -53,7 +53,7 @@ class GFFPDF_PDF_Generator {
 
 		// Clean up temp PNG files
 		foreach ( $page_images as $img ) {
-			@unlink( $img['path'] );
+			wp_delete_file( $img['path'] );
 		}
 
 		return $result;
@@ -221,11 +221,6 @@ class GFFPDF_PDF_Generator {
 			return;
 		}
 
-		// Reverse text if enabled
-		if ( ! empty( $options['reverse_text'] ) ) {
-			$value = $this->reverse_text( $value );
-		}
-
 		$font_options = $this->resolve_font_options( $options, $font_size_pt );
 		$pdf->SetFont( $font_options['family'], '', $font_options['size'] );
 		$pdf->SetTextColor( $font_options['r'], $font_options['g'], $font_options['b'] );
@@ -233,23 +228,68 @@ class GFFPDF_PDF_Generator {
 		$text_h_mm       = $font_size_pt * $pt;
 		$tcpdf_y_centred = $tcpdf_y + ( $field_h / 2 ) - ( $text_h_mm / 2 );
 
-		$pdf->SetXY( $left + 1, $tcpdf_y_centred );
-		$pdf->Cell( $field_w - 2, $text_h_mm, $value, 0, 0, 'L', false, '', 1 );
+		// ── RTL / bidirectional text handling ───────────────────────────────
+		// When "RTL Support" is enabled in the feed, check whether the value
+		// actually contains RTL characters (Arabic or Hebrew Unicode blocks).
+		// If it does, enable TCPDF's built-in bidi algorithm so the engine
+		// reorders RTL runs correctly while keeping embedded LTR text (e.g.
+		// English words or numbers) flowing left-to-right — exactly as the
+		// Unicode Bidirectional Algorithm specifies.
+		// If the value contains no RTL characters we leave everything as LTR
+		// so purely Latin/English text is never affected.
+
+		$rtl_enabled = ! empty( $options['reverse_text'] ); // option key kept for DB compat
+		$is_rtl_text = $rtl_enabled && $this->contains_rtl_characters( $value );
+
+		if ( $is_rtl_text ) {
+			// Turn on TCPDF's Unicode bidi reordering
+			$pdf->setRTL( true );
+			$pdf->SetXY( $left + 1, $tcpdf_y_centred );
+			// 'R' alignment + bidi=true: TCPDF places RTL runs from right,
+			// LTR sub-runs (numbers, Latin words) automatically from left.
+			$pdf->Cell( $field_w - 2, $text_h_mm, $value, 0, 0, 'R', false, '', 1 );
+			$pdf->setRTL( false ); // restore LTR for subsequent fields
+		} else {
+			$pdf->SetXY( $left + 1, $tcpdf_y_centred );
+			$pdf->Cell( $field_w - 2, $text_h_mm, $value, 0, 0, 'L', false, '', 1 );
+		}
 	}
 
 	/**
-	 * Reverse text character by character (RTL / mirrored text).
+	 * Return true if $text contains at least one Arabic or Hebrew code-point.
+	 *
+	 * Unicode ranges checked:
+	 *   U+0590–U+05FF  Hebrew
+	 *   U+0600–U+06FF  Arabic
+	 *   U+0700–U+074F  Syriac (uses Arabic script conventions)
+	 *   U+0750–U+077F  Arabic Supplement
+	 *   U+08A0–U+08FF  Arabic Extended-A
+	 *   U+FB1D–U+FB4F  Hebrew Presentation Forms
+	 *   U+FB50–U+FDFF  Arabic Presentation Forms-A
+	 *   U+FE70–U+FEFF  Arabic Presentation Forms-B
+	 *
+	 * This is intentionally conservative: Greek, Cyrillic, CJK, etc. are all
+	 * LTR-dominant and do NOT trigger RTL mode here.
 	 */
-	private function reverse_text( string $text ): string {
-		if ( function_exists( 'mb_strlen' ) ) {
-			$len    = mb_strlen( $text, 'UTF-8' );
-			$result = '';
-			for ( $i = $len - 1; $i >= 0; $i-- ) {
-				$result .= mb_substr( $text, $i, 1, 'UTF-8' );
-			}
-			return $result;
+	private function contains_rtl_characters( string $text ): bool {
+		// Fast bail-out: if every byte is ASCII the string cannot be RTL
+		if ( mb_strlen( $text, 'UTF-8' ) === strlen( $text ) ) {
+			return false;
 		}
-		return strrev( $text );
+
+		// Match any single character from a Hebrew or Arabic Unicode block
+		return (bool) preg_match(
+			'/[\x{0590}-\x{05FF}' .  // Hebrew
+			'\x{0600}-\x{06FF}'   .  // Arabic
+			'\x{0700}-\x{074F}'   .  // Syriac
+			'\x{0750}-\x{077F}'   .  // Arabic Supplement
+			'\x{08A0}-\x{08FF}'   .  // Arabic Extended-A
+			'\x{FB1D}-\x{FB4F}'   .  // Hebrew Presentation Forms
+			'\x{FB50}-\x{FDFF}'   .  // Arabic Presentation Forms-A
+			'\x{FE70}-\x{FEFF}'   .  // Arabic Presentation Forms-B
+			']/u',
+			$text
+		);
 	}
 
 	/* -----------------------------------------------------------------------
@@ -279,7 +319,7 @@ class GFFPDF_PDF_Generator {
 	/* -----------------------------------------------------------------------
 	 * Value normalisation
 	 * -------------------------------------------------------------------- */
-
+	
 	private function normalise_values( array $values ): array {
 		$out = [];
 		foreach ( $values as $key => $value ) {

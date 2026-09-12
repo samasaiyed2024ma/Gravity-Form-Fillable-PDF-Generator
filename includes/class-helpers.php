@@ -9,7 +9,7 @@ class GFFPDF_Helpers {
 	 * Supports: {entry_id}, {form_id}, {date}, {field:N}
 	 */
 	public static function resolve_filename( string $pattern, array $entry, array $form ): string {
-		$date     = date( 'Y-m-d' );
+		$date     = gmdate( 'Y-m-d' );
 		$entry_id = isset( $entry['id'] ) ? $entry['id'] : '0';
 		$form_id  = isset( $form['id'] )  ? $form['id']  : '0';
 
@@ -48,15 +48,19 @@ class GFFPDF_Helpers {
 	 * Recursively delete a directory.
 	 */
 	public static function delete_directory( string $dir ): bool {
-		if ( ! is_dir( $dir ) ) {
-			return false;
-		}
-		$files = array_diff( scandir( $dir ), [ '.', '..' ] );
-		foreach ( $files as $file ) {
-			$path = $dir . DIRECTORY_SEPARATOR . $file;
-			is_dir( $path ) ? self::delete_directory( $path ) : unlink( $path );
-		}
-		return rmdir( $dir );
+	// Initialize WordPress Filesystem API
+        global $wp_filesystem;
+        if ( empty( $wp_filesystem ) ) {
+            require_once ABSPATH . 'wp-admin/includes/file.php';
+            WP_Filesystem();
+        }
+
+        if ( ! $wp_filesystem->exists( $dir ) || ! $wp_filesystem->is_dir( $dir ) ) {
+            return false;
+        }
+
+        // Deletes the directory and all of its contents recursively
+        return (bool) $wp_filesystem->delete( $dir, true );
 	}
 
 	/**

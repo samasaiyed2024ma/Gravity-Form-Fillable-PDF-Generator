@@ -35,14 +35,14 @@ class GFFPDF_Feed_Settings {
 	public function add_form_settings_menu( array $menu_items ): array {
 		$menu_items[] = [
 			'name'  => 'gffpdf',
-			'label' => __( 'Fillable PDF', 'gf-fillable-pdf' ),
+			'label' => __( 'Fillable PDF', 'gf-fillable-pdf-generator' ),
 		];
 		return $menu_items;
 	}
 
 	public function render_form_settings_page(): void {
 		if ( ! GFFPDF_Security::current_user_can() ) {
-			wp_die( esc_html__( 'Permission denied.', 'gf-fillable-pdf' ) );
+			wp_die( esc_html__( 'Permission denied.', 'gf-fillable-pdf-generator' ) );
 		}
 
 		$form_id = absint( rgget( 'id' ) );
@@ -97,19 +97,19 @@ class GFFPDF_Feed_Settings {
 			'form_id'  => $form_id,
 			'fonts'    => GFFPDF_Font_Manager::get_all_fonts(),
 			'strings'  => [
-				'confirm_delete'    => __( 'Are you sure you want to delete this feed?', 'gf-fillable-pdf' ),
-				'confirm_duplicate' => __( 'Duplicate this feed?', 'gf-fillable-pdf' ),
-				'saving'            => __( 'Saving...', 'gf-fillable-pdf' ),
-				'saved'             => __( 'Feed saved.', 'gf-fillable-pdf' ),
-				'error'             => __( 'An error occurred. Please try again.', 'gf-fillable-pdf' ),
-				'uploading'         => __( 'Uploading PDF...', 'gf-fillable-pdf' ),
-				'upload_success'    => __( 'PDF uploaded successfully.', 'gf-fillable-pdf' ),
-				'no_fields'         => __( 'No fillable fields found in this PDF.', 'gf-fillable-pdf' ),
-				'uploading_font'    => __( 'Uploading font...',  'gf-fillable-pdf'),
-				'font_uploaded'     => __( 'Font uploaded.', 'gf-fillable-pdf' ),
-				'confirm_del_font'  => __( 'Delete this font', 'gf-fillable-pdf' ),
-				'add_rule' 			=> __( '+ Add Rule', 'gf-fillable-pdf' ),
-				'remove_rule'       => __( 'Remove', 'gf-fillable-pdf' ), 
+				'confirm_delete'    => __( 'Are you sure you want to delete this feed?', 'gf-fillable-pdf-generator' ),
+				'confirm_duplicate' => __( 'Duplicate this feed?', 'gf-fillable-pdf-generator' ),
+				'saving'            => __( 'Saving...', 'gf-fillable-pdf-generator' ),
+				'saved'             => __( 'Feed saved.', 'gf-fillable-pdf-generator' ),
+				'error'             => __( 'An error occurred. Please try again.', 'gf-fillable-pdf-generator' ),
+				'uploading'         => __( 'Uploading PDF...', 'gf-fillable-pdf-generator' ),
+				'upload_success'    => __( 'PDF uploaded successfully.', 'gf-fillable-pdf-generator' ),
+				'no_fields'         => __( 'No fillable fields found in this PDF.', 'gf-fillable-pdf-generator' ),
+				'uploading_font'    => __( 'Uploading font...',  'gf-fillable-pdf-generator'),
+				'font_uploaded'     => __( 'Font uploaded.', 'gf-fillable-pdf-generator' ),
+				'confirm_del_font'  => __( 'Delete this font', 'gf-fillable-pdf-generator' ),
+				'add_rule' 			=> __( '+ Add Rule', 'gf-fillable-pdf-generator' ),
+				'remove_rule'       => __( 'Remove', 'gf-fillable-pdf-generator' ), 
 			],
 		] );
 	}
@@ -123,6 +123,7 @@ class GFFPDF_Feed_Settings {
 
 		// Mappings are posted as a JSON string to avoid PHP's dot-to-underscore
 		// mangling of POST keys (e.g. field id "1.3" becomes "1_3" in $_POST).
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Nonce verified via GFFPDF_Security::check_ajax(), input sanitized manually or via JSON decode.
 		$raw_mappings = $_POST['mappings_json'] ?? '';
 		$mappings     = [];
 		if ( is_string( $raw_mappings ) && $raw_mappings !== '' ) {
@@ -153,7 +154,7 @@ class GFFPDF_Feed_Settings {
 		}
 
 		// Build feed_settings array, ensuring save_pdfs defaults to true
-		$raw_settings              = $_POST['feed_settings'] ?? [];
+		$raw_settings              = isset( $_POST['feed_settings'] ) ? wp_unslash( (array) $_POST['feed_settings'] ) : [];
 		$raw_settings['save_pdfs'] = $raw_settings['save_pdfs'] ?? 1;
 		$raw_settings['conditional_logic'] = $conditional_logic;
 		$raw_settings['notification_ids'] = $notification_ids;
@@ -163,11 +164,12 @@ class GFFPDF_Feed_Settings {
 			'feed_name'     => sanitize_text_field( wp_unslash( $_POST['feed_name'] ?? '' ) ),
 			'template_path' => sanitize_text_field( wp_unslash( $_POST['template_path'] ?? '' ) ),
 			'mappings'      => $mappings,
-			'is_active'     => absint( $_POST['is_active'] ?? 0 ), // Fix: was isset() which always returns true even when value is "0"
+			'is_active'     => absint( $_POST['is_active'] ?? 0 ),
 			'settings'      => $raw_settings,
 		];
 
 		$feed_id = absint( $_POST['feed_id'] ?? 0 );
+		// phpcs:enable
 
 		if ( $feed_id ) {
 			$result = self::update_feed( $feed_id, $data );
@@ -180,7 +182,7 @@ class GFFPDF_Feed_Settings {
 			wp_send_json_error( [ 'message' => $result->get_error_message() ] );
 		}
 
-		wp_send_json_success( [ 'feed_id' => $feed_id, 'message' => __( 'Feed saved successfully.', 'gf-fillable-pdf' ) ] );
+		wp_send_json_success( [ 'feed_id' => $feed_id, 'message' => __( 'Feed saved successfully.', 'gf-fillable-pdf-generator' ) ] );
 	}
 
 	public function ajax_delete_feed(): void {
@@ -188,11 +190,11 @@ class GFFPDF_Feed_Settings {
 		$feed_id = absint( $_POST['feed_id'] ?? 0 );
 
 		if ( ! $feed_id ) {
-			wp_send_json_error( [ 'message' => __( 'Invalid feed ID.', 'gf-fillable-pdf' ) ] );
+			wp_send_json_error( [ 'message' => __( 'Invalid feed ID.', 'gf-fillable-pdf-generator' ) ] );
 		}
 
 		self::delete_feed( $feed_id );
-		wp_send_json_success( [ 'message' => __( 'Feed deleted.', 'gf-fillable-pdf' ) ] );
+		wp_send_json_success( [ 'message' => __( 'Feed deleted.', 'gf-fillable-pdf-generator' ) ] );
 	}
 
 	public function ajax_toggle_feed(): void {
@@ -201,7 +203,7 @@ class GFFPDF_Feed_Settings {
 		$is_active = absint( $_POST['is_active'] ?? 0 );
 
 		if ( ! $feed_id ) {
-			wp_send_json_error( [ 'message' => __( 'Invalid feed ID.', 'gf-fillable-pdf' ) ] );
+			wp_send_json_error( [ 'message' => __( 'Invalid feed ID.', 'gf-fillable-pdf-generator' ) ] );
 		}
 
 		self::toggle_feed( $feed_id, $is_active );
@@ -214,12 +216,12 @@ class GFFPDF_Feed_Settings {
 		$feed    = self::get_feed( $feed_id );
 
 		if ( ! $feed ) {
-			wp_send_json_error( [ 'message' => __( 'Feed not found.', 'gf-fillable-pdf' ) ] );
+			wp_send_json_error( [ 'message' => __( 'Feed not found.', 'gf-fillable-pdf-generator' ) ] );
 		}
 
 		$new_id = self::create_feed( [
 			'form_id'       => $feed->form_id,
-			'feed_name'     => $feed->feed_name . ' (' . __( 'Copy', 'gf-fillable-pdf' ) . ')',
+			'feed_name'     => $feed->feed_name . ' (' . __( 'Copy', 'gf-fillable-pdf-generator' ) . ')',
 			'template_path' => $feed->template_path,
 			'settings'      => json_decode( $feed->settings, true ) ?? [],
 			'mappings'      => json_decode( $feed->mappings, true ) ?? [],
@@ -230,14 +232,14 @@ class GFFPDF_Feed_Settings {
 			wp_send_json_error( [ 'message' => $new_id->get_error_message() ] );
 		}
 
-		wp_send_json_success( [ 'feed_id' => $new_id, 'message' => __( 'Feed duplicated.', 'gf-fillable-pdf' ) ] );
+		wp_send_json_success( [ 'feed_id' => $new_id, 'message' => __( 'Feed duplicated.', 'gf-fillable-pdf-generator' ) ] );
 	}
 
 	public function ajax_upload_pdf(): void {
 		GFFPDF_Security::check_ajax();
 
 		if ( empty( $_FILES['pdf_file'] ) ) {
-			wp_send_json_error( [ 'message' => __( 'No file uploaded.', 'gf-fillable-pdf' ) ] );
+			wp_send_json_error( [ 'message' => __( 'No file uploaded.', 'gf-fillable-pdf-generator' ) ] );
 		}
 
 		$handler = new GFFPDF_Template_Handler();
@@ -264,7 +266,7 @@ class GFFPDF_Feed_Settings {
 		$feed    = self::get_feed( $feed_id );
 
 		if ( ! $feed ) {
-			wp_send_json_error( [ 'message' => __( 'Feed not found.', 'gf-fillable-pdf' ) ] );
+			wp_send_json_error( [ 'message' => __( 'Feed not found.', 'gf-fillable-pdf-generator' ) ] );
 		}
 
 		// Decode JSON columns — default to empty object/array so JS never
@@ -307,7 +309,7 @@ class GFFPDF_Feed_Settings {
 		GFFPDF_Security::check_ajax();
 
 		if( empty( $_FILES['font_file'] ) ){
-			wp_send_json_error( ['message' => __( 'No font file uploaded', 'gf-fillable-pdf' )] );
+			wp_send_json_error( ['message' => __( 'No font file uploaded', 'gf-fillable-pdf-generator' )] );
 		}
 
 		$label = sanitize_text_field( wp_unslash( $_POST['font_label'] ?? '' ) );
@@ -320,7 +322,7 @@ class GFFPDF_Feed_Settings {
 		wp_send_json_success( [
 			'family' => $result,
 			'fonts' => GFFPDF_Font_Manager::get_all_fonts(),
-			'message' => __( 'Font uploaded successfully.', 'gf-fillable-pdf' ),
+			'message' => __( 'Font uploaded successfully.', 'gf-fillable-pdf-generator' ),
 		] );
 	}
 
@@ -329,13 +331,13 @@ class GFFPDF_Feed_Settings {
 
 		$family = sanitize_key( wp_unslash( $_POST['family'] ?? '' ) );
 		if( !$family ){
-			wp_send_json_error( ['message' => __( 'Invalid font.', 'gf-fillable-pdf' )] );
+			wp_send_json_error( ['message' => __( 'Invalid font.', 'gf-fillable-pdf-generator' )] );
 		}
 
 		GFFPDF_Font_Manager::delete_font( $family );
 		wp_send_json_success( [
 			'fonts' => GFFPDF_Font_Manager::get_all_fonts(),
-			'message' => __( 'Font Deleted', 'gf-fillable-pdf' ),
+			'message' => __( 'Font Deleted', 'gf-fillable-pdf-generator' ),
 		] );
 	}
 
@@ -368,7 +370,7 @@ class GFFPDF_Feed_Settings {
 		$atts = shortcode_atts( [
 			'feed_id' => 0,
 			'entry_id' => 0,
-			'label' => __( 'Download PDF', 'gf-fillable-pdf' ),
+			'label' => __( 'Download PDF', 'gf-fillable-pdf-generator' ),
 			'class' => 'gffpdf-shortcode-link',
 		], $atts, 'gffpdf' );
 
@@ -445,7 +447,7 @@ class GFFPDF_Feed_Settings {
 		);
 
 		if ( $inserted === false ) {
-			return new WP_Error( 'db_error', __( 'Could not save feed.', 'gf-fillable-pdf' ) );
+			return new WP_Error( 'db_error', __( 'Could not save feed.', 'gf-fillable-pdf-generator' ) );
 		}
 
 		GFFPDF_Logger::info( 'Feed created', [ 'id' => $wpdb->insert_id, 'form_id' => $clean['form_id'] ] );

@@ -6,7 +6,7 @@
  * Require at least: 5.8
  * Require PHP: 7.4
  * Author: Mervan Agency
- * Author URI: mervanagency.io
+ * Author URI: https://mervanagency.io
  * License: GPL v2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain: gf-fillable-pdf-generator
@@ -50,8 +50,8 @@ function gffpdf_init(){
             echo '<div class="notice notice-error"><p>' .
 			     sprintf(
 			     	/* translators: %s: required PHP version */
-			     	esc_html__( 'GF Fillable PDF Generator requires PHP %s or higher.', 'gf-fillable-pdf' ),
-			     	GFFPDF_MIN_PHP
+			     	esc_html__( 'GF Fillable PDF Generator requires PHP %s or higher.', 'gf-fillable-pdf-generator' ),
+			     	esc_html( GFFPDF_MIN_PHP ) 
 			     ) .
 			     '</p></div>';
         });
@@ -62,7 +62,7 @@ function gffpdf_init(){
 	if ( ! class_exists( 'GFForms' ) ) {
 		add_action( 'admin_notices', function() {
 			echo '<div class="notice notice-error"><p>' .
-			     esc_html__( 'GF Fillable PDF Generator requires Gravity Forms to be installed and activated.', 'gf-fillable-pdf' ) .
+			     esc_html__( 'GF Fillable PDF Generator requires Gravity Forms to be installed and activated.', 'gf-fillable-pdf-generator' ) .
 			     '</p></div>';
 		} );
 		return;

@@ -36,8 +36,14 @@ class GFFPDF_File_Handler {
 		$dest_name = $base . '-' . uniqid() . '.pdf';
 		$dest_path = $dest_dir . $dest_name;
 
-		if ( ! move_uploaded_file( $file['tmp_name'], $dest_path ) ) {
-			return new WP_Error( 'upload_failed', esc_html__( 'Failed to move uploaded file.', 'gf-fillable-pdf' ) );
+		global $wp_filesystem;
+		if ( empty( $wp_filesystem ) ) {
+			require_once ABSPATH . 'wp-admin/includes/file.php';
+			WP_Filesystem();
+		}
+
+		if ( ! $wp_filesystem->move( $file['tmp_name'], $dest_path, true ) ) {
+			return new WP_Error( 'upload_failed', esc_html__( 'Failed to move uploaded file.', 'gf-fillable-pdf-generator' ) );
 		}
 
 		GFFPDF_Logger::info( 'Template uploaded', [ 'path' => $dest_path ] );
@@ -52,7 +58,7 @@ class GFFPDF_File_Handler {
 			return false;
 		}
 		if ( file_exists( $path ) ) {
-			return unlink( $path );
+			return wp_delete_file( $path );
 		}
 		return false;
 	}
@@ -94,7 +100,7 @@ class GFFPDF_File_Handler {
 		}
 
 		if ( file_put_contents( $path, $content ) === false ) {
-			return new WP_Error( 'save_failed', esc_html__( 'Failed to save generated PDF.', 'gf-fillable-pdf' ) );
+			return new WP_Error( 'save_failed', esc_html__( 'Failed to save generated PDF.', 'gf-fillable-pdf-generator' ) );
 		}
 
 		GFFPDF_Logger::info( 'Generated PDF saved', [ 'path' => $path ] );
@@ -112,15 +118,23 @@ class GFFPDF_File_Handler {
 	 * Stream a generated PDF to the browser for inline viewing.
 	 */
 	public static function stream_pdf( string $path, string $filename = 'document.pdf' ): void {
-		if ( ! file_exists( $path ) || ! GFFPDF_Security::is_safe_path( $path ) ) {
-			wp_die( esc_html__( 'PDF not found.', 'gf-fillable-pdf' ), 404 );
+		// Initialize WordPress Filesystem API
+        global $wp_filesystem;
+        if ( empty( $wp_filesystem ) ) {
+            require_once ABSPATH . 'wp-admin/includes/file.php';
+            WP_Filesystem();
+        }
+
+		if ( ! $wp_filesystem->exists( $path ) || ! GFFPDF_Security::is_safe_path( $path ) ) {
+			wp_die( esc_html__( 'PDF not found.', 'gf-fillable-pdf-generator' ), 404 );
 		}
 
 		header( 'Content-Type: application/pdf' );
 		header( 'Content-Disposition: inline; filename="' . sanitize_file_name( $filename ) . '"' );
 		header( 'Content-Length: ' . filesize( $path ) );
 		header( 'Cache-Control: private, max-age=0, must-revalidate' );
-		readfile( $path );
+		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Outputting raw binary PDF stream; escaping would corrupt the file.
+		echo $wp_filesystem->get_contents( $path );
 		exit;
 	}
 
@@ -128,15 +142,23 @@ class GFFPDF_File_Handler {
 	 * Force-download a generated PDF.
 	 */
 	public static function download_pdf( string $path, string $filename = 'document.pdf' ): void {
-		if ( ! file_exists( $path ) || ! GFFPDF_Security::is_safe_path( $path ) ) {
-			wp_die( esc_html__( 'PDF not found.', 'gf-fillable-pdf' ), 404 );
+		// Initialize WordPress Filesystem API
+        global $wp_filesystem;
+        if ( empty( $wp_filesystem ) ) {
+            require_once ABSPATH . 'wp-admin/includes/file.php';
+            WP_Filesystem();
+        }
+
+		if ( ! $wp_filesystem->exists( $path ) || ! GFFPDF_Security::is_safe_path( $path ) ) {
+			wp_die( esc_html__( 'PDF not found.', 'gf-fillable-pdf-generator' ), 404 );
 		}
 
 		header( 'Content-Type: application/octet-stream' );
 		header( 'Content-Disposition: attachment; filename="' . sanitize_file_name( $filename ) . '"' );
 		header( 'Content-Length: ' . filesize( $path ) );
 		header( 'Cache-Control: must-revalidate' );
-		readfile( $path );
+		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Outputting raw binary PDF stream; escaping would corrupt the file.
+		echo $wp_filesystem->get_contents( $path );
 		exit;
 	}
 
@@ -156,7 +178,7 @@ class GFFPDF_File_Handler {
 
 		foreach ( $files as $file ) {
 			if ( is_file( $file ) && filemtime( $file ) < $cutoff ) {
-				unlink( $file );
+				wp_delete_file( $file );
 			}
 		}
 	}

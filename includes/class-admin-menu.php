@@ -26,8 +26,8 @@ class GFFPDF_Admin_Menu {
 		// Hidden overview page — accessed via direct URL or GF settings
 		add_submenu_page(
 			null,
-			__( 'GF Fillable PDF Generator', 'gf-fillable-pdf' ),
-			__( 'Fillable PDF', 'gf-fillable-pdf' ),
+			__( 'GF Fillable PDF Generator', 'gf-fillable-pdf-generator' ),
+			__( 'Fillable PDF', 'gf-fillable-pdf-generator' ),
 			GFFPDF_Security::CAPABILITY,
 			'gffpdf-generator',
 			[ $this, 'render_overview_page' ]
@@ -38,8 +38,8 @@ class GFFPDF_Admin_Menu {
 		// so any bookmarked URLs still work.
 		add_submenu_page(
 			null, // hidden
-			__( 'Manage Fonts - GF PDF', 'gf-fillable-pdf' ),
-			__( 'PDF Fonts', 'gf-fillable-pdf' ),
+			__( 'Manage Fonts - GF PDF', 'gf-fillable-pdf-generator' ),
+			__( 'PDF Fonts', 'gf-fillable-pdf-generator' ),
 			GFFPDF_Security::get_capability(),
 			'gffpdf-fonts',
 			[ $this, 'render_font_manager_redirect' ]
@@ -57,7 +57,7 @@ class GFFPDF_Admin_Menu {
 
 	public function render_font_manager_page(): void {
 		if ( ! GFFPDF_Security::current_user_can() ) {
-			wp_die( esc_html__( 'You do not have permission to access this page.', 'gf-fillable-pdf' ), 403 );
+			wp_die( esc_html__( 'You do not have permission to access this page.', 'gf-fillable-pdf-generator' ), 403 );
 		}
 
 		wp_enqueue_style(
@@ -87,33 +87,33 @@ class GFFPDF_Admin_Menu {
 		$builtin_fonts = GFFPDF_Font_Manager::get_builtin_fonts();
 
 		echo '<div class="wrap gffpdf-wrap">';
-		echo '<h1>' . esc_html__('Manage Fonts', 'gf-fillable-pdf') . '</h1>';
-		echo '<p>' . esc_html__( 'Upload custom fonts (.ttf or .otf) for use in PDF generation. Built-in fonts are always available.', 'gf-fillable-pdf' ) . '</p>';
+		echo '<h1>' . esc_html__('Manage Fonts', 'gf-fillable-pdf-generator') . '</h1>';
+		echo '<p>' . esc_html__( 'Upload custom fonts (.ttf or .otf) for use in PDF generation. Built-in fonts are always available.', 'gf-fillable-pdf-generator' ) . '</p>';
 
 		// Upload font
 		echo '<div class="gffpdf-settings-panel" style="max-width:700px;">';
-		echo '<h2>' . esc_html__( 'Upload Custom Font', 'gf-fillable-pdf' ) . '</h2>';
+		echo '<h2>' . esc_html__( 'Upload Custom Font', 'gf-fillable-pdf-generator' ) . '</h2>';
 		echo '<table class="form-table"><tbody>';
-		echo '<tr><th><label for="gffpdf-font-file">' . esc_html__( 'Font File (.ttf / .otf)', 'gf-fillable-pdf' ) . '</label></th>';
+		echo '<tr><th><label for="gffpdf-font-file">' . esc_html__( 'Font File (.ttf / .otf)', 'gf-fillable-pdf-generator' ) . '</label></th>';
 		echo '<td><input type="file" id="gffpdf-font-file" accept=".ttf,.otf"></td></tr>';
-		echo '<tr><th><label for="gffpdf-font-label">' . esc_html__( 'Display Name', 'gf-fillable-pdf' ) . '</label></th>';
-		echo '<td><input type="text" id="gffpdf-font-label" class="regular-text" placeholder="' . esc_attr__( 'e.g. My Custom Font', 'gf-fillable-pdf' ) . '"></td></tr>';
+		echo '<tr><th><label for="gffpdf-font-label">' . esc_html__( 'Display Name', 'gf-fillable-pdf-generator' ) . '</label></th>';
+		echo '<td><input type="text" id="gffpdf-font-label" class="regular-text" placeholder="' . esc_attr__( 'e.g. My Custom Font', 'gf-fillable-pdf-generator' ) . '"></td></tr>';
 		echo '</tbody></table>';
-		echo '<p><button type="button" id="gffpdf-font-upload-btn" class="button button-primary">' . esc_html__( 'Upload Font', 'gf-fillable-pdf' ) . '</button> <span id="gffpdf-font-upload-status"></span></p>';
+		echo '<p><button type="button" id="gffpdf-font-upload-btn" class="button button-primary">' . esc_html__( 'Upload Font', 'gf-fillable-pdf-generator' ) . '</button> <span id="gffpdf-font-upload-status"></span></p>';
 		echo '</div>';
 
 		// Custom fonts list
 		echo '<div class="gffpdf-settings-panel" style="max-width:700px;margin-top:20px;">';
-		echo '<h2>' . esc_html__( 'Uploaded Custom Fonts', 'gf-fillable-pdf' ) . '</h2>';
+		echo '<h2>' . esc_html__( 'Uploaded Custom Fonts', 'gf-fillable-pdf-generator' ) . '</h2>';
 		if ( empty( $custom_fonts ) ) {
-			echo '<p>' . esc_html__( 'No custom fonts uploaded yet.', 'gf-fillable-pdf' ) . '</p>';
+			echo '<p>' . esc_html__( 'No custom fonts uploaded yet.', 'gf-fillable-pdf-generator' ) . '</p>';
 		} else {
-			echo '<table class="widefat"><thead><tr><th>' . esc_html__( 'Family Key', 'gf-fillable-pdf' ) . '</th><th>' . esc_html__( 'Display Name', 'gf-fillable-pdf' ) . '</th><th>' . esc_html__( 'Action', 'gf-fillable-pdf' ) . '</th></tr></thead><tbody id="gffpdf-custom-fonts-list">';
+			echo '<table class="widefat"><thead><tr><th>' . esc_html__( 'Family Key', 'gf-fillable-pdf-generator' ) . '</th><th>' . esc_html__( 'Display Name', 'gf-fillable-pdf-generator' ) . '</th><th>' . esc_html__( 'Action', 'gf-fillable-pdf-generator' ) . '</th></tr></thead><tbody id="gffpdf-custom-fonts-list">';
 			foreach ( $custom_fonts as $family => $label ) {
 				echo '<tr id="gffpdf-font-row-' . esc_attr( $family ) . '">';
 				echo '<td><code>' . esc_html( $family ) . '</code></td>';
 				echo '<td>' . esc_html( $label ) . '</td>';
-				echo '<td><button type="button" class="button button-small gffpdf-delete-font" data-family="' . esc_attr( $family ) . '">' . esc_html__( 'Delete', 'gf-fillable-pdf' ) . '</button></td>';
+				echo '<td><button type="button" class="button button-small gffpdf-delete-font" data-family="' . esc_attr( $family ) . '">' . esc_html__( 'Delete', 'gf-fillable-pdf-generator' ) . '</button></td>';
 				echo '</tr>';
 			}
 			echo '</tbody></table>';
@@ -122,8 +122,8 @@ class GFFPDF_Admin_Menu {
  
 		// Built-in fonts reference
 		echo '<div class="gffpdf-settings-panel" style="max-width:700px;margin-top:20px;">';
-		echo '<h2>' . esc_html__( 'Built-in Fonts', 'gf-fillable-pdf' ) . '</h2>';
-		echo '<table class="widefat"><thead><tr><th>' . esc_html__( 'Family Key', 'gf-fillable-pdf' ) . '</th><th>' . esc_html__( 'Display Name', 'gf-fillable-pdf' ) . '</th></tr></thead><tbody>';
+		echo '<h2>' . esc_html__( 'Built-in Fonts', 'gf-fillable-pdf-generator' ) . '</h2>';
+		echo '<table class="widefat"><thead><tr><th>' . esc_html__( 'Family Key', 'gf-fillable-pdf-generator' ) . '</th><th>' . esc_html__( 'Display Name', 'gf-fillable-pdf-generator' ) . '</th></tr></thead><tbody>';
 		foreach ( $builtin_fonts as $fam => $lbl ) {
 			echo '<tr><td><code>' . esc_html( $fam ) . '</code></td><td>' . esc_html( $lbl ) . '</td></tr>';
 		}
@@ -141,8 +141,8 @@ class GFFPDF_Admin_Menu {
 				var file  = $('#gffpdf-font-file')[0].files[0];
 				var label = $('#gffpdf-font-label').val();
 				var $status = $('#gffpdf-font-upload-status');
-				if (!file) { $status.text('<?php echo esc_js( __( 'Please select a font file.', 'gf-fillable-pdf' ) ); ?>'); return; }
-				$status.text('<?php echo esc_js( __( 'Uploading…', 'gf-fillable-pdf' ) ); ?>');
+				if (!file) { $status.text('<?php echo esc_js( __( 'Please select a font file.', 'gf-fillable-pdf-generator' ) ); ?>'); return; }
+				$status.text('<?php echo esc_js( __( 'Uploading…', 'gf-fillable-pdf-generator' ) ); ?>');
 				var fd = new FormData();
 				fd.append('action',    'gffpdf_upload_font');
 				fd.append('nonce',     nonce);
@@ -154,13 +154,13 @@ class GFFPDF_Admin_Menu {
 						$status.text(res.data.message);
 						setTimeout(function(){ location.reload(); }, 800);
 					} else {
-						$status.text(res.data.message || '<?php echo esc_js( __( 'Upload failed.', 'gf-fillable-pdf' ) ); ?>');
+						$status.text(res.data.message || '<?php echo esc_js( __( 'Upload failed.', 'gf-fillable-pdf-generator' ) ); ?>');
 					}
 				});
 			});
  
 			$(document).on('click', '.gffpdf-delete-font', function(){
-				if (!confirm('<?php echo esc_js( __( 'Delete this font?', 'gf-fillable-pdf' ) ); ?>')) return;
+				if (!confirm('<?php echo esc_js( __( 'Delete this font?', 'gf-fillable-pdf-generator' ) ); ?>')) return;
 				var family = $(this).data('family');
 				$.post(ajaxUrl, { action: 'gffpdf_delete_font', nonce: nonce, family: family })
 				.done(function(res){
@@ -234,11 +234,11 @@ class GFFPDF_Admin_Menu {
 
 		$actions['view_pdf'] = [
 			'class' => 'gffpdf-view-pdf',
-			'link'  => '<a href="' . esc_url( $view_url ) . '" target="_blank">' . esc_html__( 'View PDF', 'gf-fillable-pdf' ) . '</a>',
+			'link'  => '<a href="' . esc_url( $view_url ) . '" target="_blank">' . esc_html__( 'View PDF', 'gf-fillable-pdf-generator' ) . '</a>',
 		];
 		$actions['download_pdf'] = [
 			'class' => 'gffpdf-download-pdf',
-			'link'  => '<a href="' . esc_url( $download_url ) . '">' . esc_html__( 'Download PDF', 'gf-fillable-pdf' ) . '</a>',
+			'link'  => '<a href="' . esc_url( $download_url ) . '">' . esc_html__( 'Download PDF', 'gf-fillable-pdf-generator' ) . '</a>',
 		];
 
 		return $actions;
@@ -254,13 +254,13 @@ class GFFPDF_Admin_Menu {
 		$regen_nonce = GFFPDF_Security::create_nonce( 'gffpdf_regenerate_' . $entry_id );
 
 		echo '<div class="postbox gffpdf-entry-box">';
-		echo '<h3 class="hndle"><span>' . esc_html__( 'Fillable PDFs', 'gf-fillable-pdf' ) . '</span></h3>';
+		echo '<h3 class="hndle"><span>' . esc_html__( 'Fillable PDFs', 'gf-fillable-pdf-generator' ) . '</span></h3>';
 		echo '<div class="inside">';
 
 		echo '<div id="gffpdf-regen-notice" style="display:none;margin-bottom:8px;padding:8px 12px;border-radius:4px;font-size:13px;line-height:1.5;"></div>';
 
 		if ( empty( $pdfs ) ) {
-			echo '<p style="color:#666;font-style:italic;">' . esc_html__( 'No PDFs generated for this entry yet.', 'gf-fillable-pdf' ) . '</p>';
+			echo '<p style="color:#666;font-style:italic;">' . esc_html__( 'No PDFs generated for this entry yet.', 'gf-fillable-pdf-generator' ) . '</p>';
 		} else {
 			echo '<ul class="gffpdf-pdf-list" id="gffpdf-pdf-list" style="margin:0 0 10px;padding:0;list-style:none;">';
 			foreach ( $pdfs as $pdf ) {
@@ -273,10 +273,10 @@ class GFFPDF_Admin_Menu {
 				echo '<li style="padding:6px 0;border-bottom:1px solid #f0f0f0;">';
 				echo '<strong style="display:block;font-size:13px;">' . esc_html( $name ) . '</strong>';
 				if ( $exists ) {
-					echo '<a href="' . esc_url( $view_url ) . '" target="_blank" style="font-size:12px;">' . esc_html__( 'View', 'gf-fillable-pdf' ) . '</a> &nbsp;';
-					echo '<a href="' . esc_url( $download_url ) . '" style="font-size:12px;">' . esc_html__( 'Download', 'gf-fillable-pdf' ) . '</a>';
+					echo '<a href="' . esc_url( $view_url ) . '" target="_blank" style="font-size:12px;">' . esc_html__( 'View', 'gf-fillable-pdf-generator' ) . '</a> &nbsp;';
+					echo '<a href="' . esc_url( $download_url ) . '" style="font-size:12px;">' . esc_html__( 'Download', 'gf-fillable-pdf-generator' ) . '</a>';
 				} else {
-					echo '<span style="font-size:12px;color:#dc2626;">⚠ ' . esc_html__( 'File missing', 'gf-fillable-pdf' ) . '</span>';
+					echo '<span style="font-size:12px;color:#dc2626;">⚠ ' . esc_html__( 'File missing', 'gf-fillable-pdf-generator' ) . '</span>';
 				}
 				echo '</li>';
 			}
@@ -289,7 +289,7 @@ class GFFPDF_Admin_Menu {
 		echo ' data-entry-id="' . esc_attr( $entry_id ) . '"';
 		echo ' data-nonce="' . esc_attr( $regen_nonce ) . '"';
 		echo ' data-ajax-url="' . esc_url( admin_url( 'admin-ajax.php' ) ) . '">';
-		echo esc_html__( 'Regenerate PDFs', 'gf-fillable-pdf' );
+		echo esc_html__( 'Regenerate PDFs', 'gf-fillable-pdf-generator' );
 		echo '</button>';
 		echo '</p>';
 
@@ -301,7 +301,7 @@ class GFFPDF_Admin_Menu {
 				var $notice = $('#gffpdf-regen-notice');
 				var originalText = $btn.text();
 
-				$btn.prop('disabled', true).text('<?php echo esc_js( __( 'Generating…', 'gf-fillable-pdf' ) ); ?>');
+				$btn.prop('disabled', true).text('<?php echo esc_js( __( 'Generating…', 'gf-fillable-pdf-generator' ) ); ?>');
 				$notice.hide().removeAttr('style');
 
 				$.ajax({
@@ -324,7 +324,7 @@ class GFFPDF_Admin_Menu {
 					} else {
 						var msg = (res && res.data && res.data.message) 
 						? res.data.message 
-						: '<?php echo esc_js( __( 'PDF generation failed. Please check your feed settings.', 'gf-fillable-pdf' ) ); ?>';
+						: '<?php echo esc_js( __( 'PDF generation failed. Please check your feed settings.', 'gf-fillable-pdf-generator' ) ); ?>';
 						$notice
 							.css({ background: '#fef2f2', color: '#991b1b', border: '1px solid #fca5a5', padding: '8px 12px', borderRadius: '4px', fontSize: '13px', marginBottom: '8px', whiteSpace: 'pre-wrap', wordBreak: 'break-word' })
 							.text(msg)
@@ -373,14 +373,14 @@ class GFFPDF_Admin_Menu {
 	private function serve_pdf( string $mode ): void {
 		$nonce  = sanitize_text_field( wp_unslash( $_GET['nonce'] ?? '' ) );
 		if ( ! GFFPDF_Security::verify_nonce( $nonce ) || ! GFFPDF_Security::current_user_can() ) {
-			wp_die( esc_html__( 'Permission denied.', 'gf-fillable-pdf' ), 403 );
+			wp_die( esc_html__( 'Permission denied.', 'gf-fillable-pdf-generator' ), 403 );
 		}
 
 		$pdf_id = absint( $_GET['pdf_id'] ?? 0 );
 		$record = GFFPDF_Entry_Handler::get_pdf_record( $pdf_id );
 
 		if ( ! $record || ! file_exists( $record->pdf_path ) ) {
-			wp_die( esc_html__( 'PDF not found.', 'gf-fillable-pdf' ), 404 );
+			wp_die( esc_html__( 'PDF not found.', 'gf-fillable-pdf-generator' ), 404 );
 		}
 
 		if ( $mode === 'download' ) {

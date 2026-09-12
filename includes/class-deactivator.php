@@ -11,6 +11,13 @@ class GFFPDF_Deactivator {
 	public static function cleanup_data(): void {
 		global $wpdb;
 
+		// Initialize WordPress Filesystem API
+        global $wp_filesystem;
+        if ( empty( $wp_filesystem ) ) {
+            require_once ABSPATH . 'wp-admin/includes/file.php';
+            WP_Filesystem();
+        }
+
 		// Drop tables
 		$wpdb->query("DROP TABLE IF EXISTS {$wpdb->prefix}gffpdf_feeds");
 		$wpdb->query("DROP TABLE IF EXISTS {$wpdb->prefix}gffpdf_entries");
@@ -27,11 +34,13 @@ class GFFPDF_Deactivator {
 			if($files){
 				foreach($files as $file){
 					if(is_file($file)){
-						@unlink($file);
+						wp_delete_file($file);
 					}
 				}
 			}
-			@rmdir($upload_dir);
+
+            // Use delete() with the recursive flag set to true to remove directories
+            $wp_filesystem->delete( $upload_dir, true );
 		}
 	}
 }

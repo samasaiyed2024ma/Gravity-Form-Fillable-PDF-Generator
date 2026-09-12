@@ -14,11 +14,12 @@ class GFFPDF_Activator {
 	private static function check_requirements() {
 		if ( version_compare( PHP_VERSION, GFFPDF_MIN_PHP, '<' ) ) {
 			deactivate_plugins( plugin_basename( GFFPDF_PATH . 'gf-fillable-pdf-generator.php' ) );
-			wp_die( sprintf( esc_html__( 'GF Fillable PDF Generator requires PHP %s or higher.', 'gf-fillable-pdf' ), GFFPDF_MIN_PHP ) );
+			// translators: %s: The minimum required PHP version.
+			wp_die( sprintf( esc_html__( 'GF Fillable PDF Generator requires PHP %s or higher.', 'gf-fillable-pdf-generator' ), esc_html(GFFPDF_MIN_PHP) ) );
 		}
 		if ( ! class_exists( 'GFForms' ) ) {
 			deactivate_plugins( plugin_basename( GFFPDF_PATH . 'gf-fillable-pdf-generator.php' ) );
-			wp_die( esc_html__( 'GF Fillable PDF Generator requires Gravity Forms to be installed and activated.', 'gf-fillable-pdf' ) );
+			wp_die( esc_html__( 'GF Fillable PDF Generator requires Gravity Forms to be installed and activated.', 'gf-fillable-pdf-generator' ) );
 		}
 	}
 
