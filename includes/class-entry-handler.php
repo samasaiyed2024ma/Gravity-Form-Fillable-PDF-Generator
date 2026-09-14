@@ -6,9 +6,42 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  */
 class GFFPDF_Entry_Handler {
 
+	/**
+	 * Per-request cache so a feed's PDF is only ever rendered once even
+	 * though it may be needed both for a notification attachment (which
+	 * Gravity Forms sends BEFORE gform_after_submission fires) and for the
+	 * normal after-submission save/record step.
+	 *
+	 * Keyed by "{entry_id}:{feed_id}" => [
+	 *     'path'      => string|null   Absolute file path (permanent or temp),
+	 *     'is_temp'   => bool          True if $path lives in the temp dir and
+	 *                                  must be deleted once the request ends,
+	 *     'record_id' => int|null      DB record id, once persisted,
+	 *     'error'     => WP_Error|null,
+	 * ]
+	 */
+	private static array $pdf_cache = [];
+
+	/** Temp attachment-only files created during this request, cleaned up on shutdown. */
+	private static array $temp_files = [];
+
 	public function __construct() {
 		add_action( 'gform_after_submission', [ $this, 'generate_pdf' ], 10, 2 );
 		add_action( 'wp_ajax_gffpdf_regenerate', [ $this, 'ajax_regenerate' ] );
+
+		// IMPORTANT: registered unconditionally, not from inside gform_after_submission.
+		// Gravity Forms sends all notification emails BEFORE gform_after_submission
+		// fires (notifications are sent as part of the core submission process;
+		// gform_after_submission fires "after form validation, notification, and
+		// entry creation"). A filter added only once gform_after_submission runs
+		// is therefore always too late to affect the emails that already went out —
+		// this was the reason PDFs never showed up as attachments.
+		add_filter( 'gform_notification', [ $this, 'maybe_attach_pdf_to_notification' ], 10, 3 );
+
+		// Delete any attachment-only temp PDFs created during this request
+		// (used when "Save Generated PDFs" is disabled) once Gravity Forms
+		// has finished sending notifications and gform_after_submission has run.
+		add_action( 'shutdown', [ __CLASS__, 'cleanup_temp_attachments' ] );
 	}
 
 	/* -----------------------------------------------------------------------
@@ -40,12 +73,87 @@ class GFFPDF_Entry_Handler {
 	}
 
 	/**
-	 * Process a single feed for a given entry.
+	 * Process a single feed for a given entry — generates (or reuses an
+	 * already-generated) PDF, persists it if enabled, and stores a DB record.
 	 *
 	 * @return int|WP_Error  DB record ID on success, WP_Error describing the failure.
 	 */
-	public function process_feed( object $feed, array $entry, array $form ) {
-		$feed_id       = (int) $feed->id;
+	public function process_feed( object $feed, array $entry, array $form, bool $force_regenerate = false ) {
+		$feed_id = (int) $feed->id;
+		$result  = $this->resolve_pdf( $feed, $entry, $form, $force_regenerate );
+
+		if ( is_wp_error( $result['error'] ?? null ) ) {
+			return $result['error'];
+		}
+
+		if ( $result['is_temp'] ) {
+			// Global "Save Generated PDFs" is disabled: the file exists only
+			// as a transient attachment copy (already sent, if configured, via
+			// maybe_attach_pdf_to_notification()) and is not kept or recorded.
+			return new WP_Error( 'save_disabled',
+				sprintf( 'Feed "%s": PDF saving is disabled in global settings.', $feed->feed_name )
+			);
+		}
+
+		GFFPDF_Logger::info( 'PDF generated', [
+			'entry_id' => $entry['id'],
+			'feed_id'  => $feed_id,
+			'path'     => $result['path'],
+		] );
+
+		return $result['record_id'];
+	}
+
+	/**
+	 * Validate a feed against an entry/form, generate its PDF if needed, and
+	 * either persist it permanently or write it to a temp file — caching the
+	 * outcome per (entry, feed) so this only ever runs once per request no
+	 * matter how many places ask for it (notification attachment + the normal
+	 * after-submission save both go through here).
+	 *
+	 * @return array{path:?string,is_temp:bool,record_id:?int,error:?WP_Error}
+	 */
+	private function resolve_pdf( object $feed, array $entry, array $form, bool $force_regenerate = false ): array {
+		$feed_id  = (int) $feed->id;
+		$entry_id = (int) ( $entry['id'] ?? 0 );
+		$cache_key = $entry_id . ':' . $feed_id;
+
+		if ( ! $force_regenerate && isset( self::$pdf_cache[ $cache_key ] ) ) {
+			return self::$pdf_cache[ $cache_key ];
+		}
+
+		$result = $this->generate_and_store_pdf( $feed, $entry, $form, $force_regenerate );
+		self::$pdf_cache[ $cache_key ] = $result;
+		return $result;
+	}
+
+	/**
+	 * @return array{path:?string,is_temp:bool,record_id:?int,error:?WP_Error}
+	 */
+	private function generate_and_store_pdf( object $feed, array $entry, array $form, bool $force_regenerate = false ): array {
+		$empty_result = [ 'path' => null, 'is_temp' => false, 'record_id' => null, 'error' => null ];
+
+		$feed_id  = (int) $feed->id;
+		$entry_id = (int) ( $entry['id'] ?? 0 );
+
+		// Reuse an already-generated, still-on-disk PDF for this entry+feed
+		// instead of generating a fresh one. Without this, every time an
+		// admin uses Gravity Forms' "Resend Notifications" action (which
+		// re-fires the same notification-send code path this plugin hooks
+		// into), a brand new duplicate PDF file + DB row was created for the
+		// exact same submission — defeating the point of the retention
+		// cleanup and quietly filling the generated/ folder back up. This
+		// only short-circuits when a valid file still exists; if it was
+		// already cleaned up, generation proceeds normally below. The
+		// explicit "Regenerate PDF" admin action passes $force_regenerate to
+		// deliberately skip this and rebuild from current entry data instead.
+		if ( ! $force_regenerate ) {
+			$existing = self::find_existing_pdf( $entry_id, $feed_id );
+			if ( $existing ) {
+				return [ 'path' => $existing->pdf_path, 'is_temp' => false, 'record_id' => (int) $existing->id, 'error' => null ];
+			}
+		}
+
 		$template_path = $feed->template_path;
 		$settings      = json_decode( $feed->settings, true ) ?? [];
 		$mappings      = json_decode( $feed->mappings, true ) ?? [];
@@ -53,10 +161,10 @@ class GFFPDF_Entry_Handler {
 		// --- Template check ---
 		if ( empty( $template_path ) || ! file_exists( $template_path ) ) {
 			GFFPDF_Logger::error( 'Template file missing', [ 'feed_id' => $feed_id, 'path' => $template_path ] );
-			return new WP_Error( 'template_missing',
+			return array_merge( $empty_result, [ 'error' => new WP_Error( 'template_missing',
 				// translators: %s: The name of the feed config.
 				sprintf( __( 'Feed "%s": PDF template file is missing or has not been uploaded.', 'gf-fillable-pdf-generator' ), $feed->feed_name )
-			);
+			) ] );
 		}
 
 		// --- Mappings check (filter out intentionally unmapped "0"/empty values) ---
@@ -66,23 +174,33 @@ class GFFPDF_Entry_Handler {
 
 		if ( empty( $active_mappings ) ) {
 			GFFPDF_Logger::warn( 'No field mappings configured', [ 'feed_id' => $feed_id ] );
-			return new WP_Error( 'no_mappings',
+			return array_merge( $empty_result, [ 'error' => new WP_Error( 'no_mappings',
 				// translators: %s: The name of the feed config.
 				sprintf( __( 'Feed "%s": no field mappings configured — please map at least one PDF field to a form field.', 'gf-fillable-pdf-generator' ), $feed->feed_name )
-			);
+			) ] );
 		}
 
 		// --- Conditional logic ---
 		if ( ! $this->passes_conditional_logic( $settings, $entry, $form ) ) {
 			GFFPDF_Logger::info( 'Feed skipped: conditional logic', [ 'feed_id' => $feed_id, 'entry_id' => $entry['id'] ] );
-			return new WP_Error( 'conditional_logic',
+			return array_merge( $empty_result, [ 'error' => new WP_Error( 'conditional_logic',
 				// translators: %s: The name of the feed config.
 				sprintf( __( 'Feed "%s": skipped — conditional logic rules not met for this entry.', 'gf-fillable-pdf-generator' ), $feed->feed_name )
-			);
+			) ] );
 		}
 
 		// --- Build field values & generate ---
 		$field_values = $this->build_field_values( $active_mappings, $entry, $form );
+
+		$global_settings = GFFPDF_Settings::get_settings();
+
+		// The global "RTL Support" toggle enables RTL handling plugin-wide;
+		// a feed's own "Reverse Text" checkbox can also enable it individually.
+		// Either one turns the capability on — but GFFPDF_PDF_Generator only
+		// ever applies right-to-left rendering to values that actually contain
+		// Arabic/Hebrew characters, so plain English/Latin text is never
+		// affected no matter which of these is enabled.
+		$settings['reverse_text'] = ! empty( $settings['reverse_text'] ) || ! empty( $global_settings['rtl_support'] );
 
 		$generator = new GFFPDF_PDF_Generator();
 		$pdf_bytes = $generator->generate( $template_path, $field_values, $settings );
@@ -93,53 +211,41 @@ class GFFPDF_Entry_Handler {
 				'entry_id' => $entry['id'],
 				'error'    => $pdf_bytes->get_error_message(),
 			] );
-			return new WP_Error(
+			return array_merge( $empty_result, [ 'error' => new WP_Error(
 				$pdf_bytes->get_error_code(),
 				sprintf( 'Feed "%s": %s', $feed->feed_name, $pdf_bytes->get_error_message() )
-			);
+			) ] );
 		}
 
-		// --- Resolve filename ---
-		$global_settings = GFFPDF_Settings::get_settings();
-		$pattern         = $settings['filename_pattern'] ?? $global_settings['filename_pattern'];
-		$filename        = GFFPDF_Helpers::resolve_filename( $pattern, $entry, $form );
-		$filename        = GFFPDF_Helpers::ensure_pdf_extension( $filename );
-
-		// --- Save to disk ---
 		$save = $global_settings['save_pdfs'] ?? true;
-		if ( $save === false || $save === 0 || $save === '0' ) {
-			return new WP_Error( 'save_disabled',
-				sprintf( 'Feed "%s": PDF saving is disabled in global settings.', $feed->feed_name )
-			);
+		$save = ! ( $save === false || $save === 0 || $save === '0' );
+
+		if ( ! $save ) {
+			// Not persisting to server storage — still write the bytes to a
+			// short-lived temp file so email attachment can work, but it will
+			// be deleted once the request ends (see cleanup_temp_attachments()).
+			$path = GFFPDF_File_Handler::save_temp( $pdf_bytes );
+			self::$temp_files[] = $path;
+			return [ 'path' => $path, 'is_temp' => true, 'record_id' => null, 'error' => null ];
 		}
+
+		// --- Resolve filename & save permanently ---
+		$pattern  = $settings['filename_pattern'] ?? $global_settings['filename_pattern'];
+		$filename = GFFPDF_Helpers::resolve_filename( $pattern, $entry, $form );
+		$filename = GFFPDF_Helpers::ensure_pdf_extension( $filename );
 
 		$path = GFFPDF_File_Handler::save_generated( $pdf_bytes, $filename );
 		if ( is_wp_error( $path ) ) {
 			GFFPDF_Logger::error( 'PDF save failed', [ 'feed_id' => $feed_id, 'entry' => $entry['id'] ] );
-			return new WP_Error(
+			return array_merge( $empty_result, [ 'error' => new WP_Error(
 				$path->get_error_code(),
 				sprintf( 'Feed "%s": %s', $feed->feed_name, $path->get_error_message() )
-			);
+			) ] );
 		}
 
-		// --- Store record in DB ---
-		$record_id = self::save_pdf_record( $entry['id'], $form['id'], $feed_id, $path );
+		$record_id = self::save_pdf_record( (int) $entry['id'], (int) $form['id'], $feed_id, $path );
 
-		// --- Attach to notifications ---
-		$selected_notifications = $settings['notification_ids'] ?? [];
-		if ( ! empty( $selected_notifications ) && is_array( $selected_notifications ) ) {
-			$this->attach_to_selected_notifications( $path, $form, $entry, $selected_notifications );
-		} elseif ( ! empty( $settings['attach_to_email'] ) ) {
-			$this->attach_to_notifications( $path, $form, $entry );
-		}
-
-		GFFPDF_Logger::info( 'PDF generated', [
-			'entry_id' => $entry['id'],
-			'feed_id'  => $feed_id,
-			'path'     => $path,
-		] );
-
-		return $record_id;
+		return [ 'path' => $path, 'is_temp' => false, 'record_id' => $record_id, 'error' => null ];
 	}
 
 
@@ -251,7 +357,10 @@ class GFFPDF_Entry_Handler {
 					break;
 
 				case 'fileupload':
-					// Store URL, not bytes
+				case 'signature':
+					// Store the URL/path as-is — resolved to an actual file
+					// (and, for signatures, embedded as an image) later in
+					// GFFPDF_PDF_Generator, not printed as text/a link.
 					$values[ $pdf_field ] = $raw_value;
 					break;
 
@@ -267,33 +376,82 @@ class GFFPDF_Entry_Handler {
 	 * Email attachment
 	 * -------------------------------------------------------------------- */
 
-	private function attach_to_notifications( string $pdf_path, array $form, array $entry ): void {
-		add_filter( 'gform_notification', function( $notification, $form_obj, $entry_obj ) use ( $pdf_path, $form, $entry ) {
-			if ( $form_obj['id'] !== $form['id'] ) return $notification;
+	/**
+	 * Attach generated PDFs to a Gravity Forms notification as it's being sent.
+	 *
+	 * Hooked unconditionally in the constructor (see the note there on why —
+	 * in short, Gravity Forms sends notifications before gform_after_submission
+	 * fires, so this can no longer be wired up lazily from inside that hook).
+	 */
+	public function maybe_attach_pdf_to_notification( $notification, $form, $entry ) {
+		if ( empty( $form['id'] ) || empty( $entry['id'] ) ) {
+			return $notification;
+		}
+
+		$feeds = GFFPDF_Feed_Settings::get_active_feeds_by_form( (int) $form['id'] );
+		if ( empty( $feeds ) ) {
+			return $notification;
+		}
+
+		$notification_id = (string) ( $notification['id'] ?? '' );
+
+		foreach ( $feeds as $feed ) {
+			$settings = json_decode( $feed->settings, true ) ?? [];
+			$selected = $settings['notification_ids'] ?? [];
+
+			$wants_this_notification = ( ! empty( $selected ) && is_array( $selected ) )
+				? in_array( $notification_id, array_map( 'strval', $selected ), true )
+				: ! empty( $settings['attach_to_email'] );
+
+			if ( ! $wants_this_notification ) {
+				GFFPDF_Logger::info( 'Notification attach skipped: not selected for this feed', [
+					'feed_id'         => $feed->id,
+					'entry_id'        => $entry['id'],
+					'notification_id' => $notification_id,
+					'selected'        => $selected,
+				] );
+				continue;
+			}
+
+			$result = $this->resolve_pdf( $feed, $entry, $form );
+			if ( is_wp_error( $result['error'] ?? null ) || empty( $result['path'] ) ) {
+				GFFPDF_Logger::warn( 'Notification attach skipped: PDF unavailable', [
+					'feed_id'         => $feed->id,
+					'entry_id'        => $entry['id'],
+					'notification_id' => $notification_id,
+					'error'           => is_wp_error( $result['error'] ?? null ) ? $result['error']->get_error_message() : null,
+				] );
+				continue; // Failure already logged inside generate_and_store_pdf().
+			}
 
 			if ( ! isset( $notification['attachments'] ) || ! is_array( $notification['attachments'] ) ) {
 				$notification['attachments'] = [];
 			}
-			$notification['attachments'][] = $pdf_path;
-			return $notification;
-		}, 10, 3 );
+			$notification['attachments'][] = $result['path'];
+
+			GFFPDF_Logger::info( 'PDF attached to notification', [
+				'feed_id'         => $feed->id,
+				'entry_id'        => $entry['id'],
+				'notification_id' => $notification_id,
+				'path'            => $result['path'],
+			] );
+		}
+
+		return $notification;
 	}
 
 	/**
-	 * Attach PDF only to specific notificion IDs.
+	 * Delete any attachment-only temp PDFs created during this request.
+	 * Runs on 'shutdown', i.e. after Gravity Forms has finished sending
+	 * notifications and gform_after_submission has run, so it's always safe.
 	 */
-	private function attach_to_selected_notifications(string $pdf_path, array $form, array $entry, array $notification_ids): void{
-		add_filter('gform_notification', function($notification, $form_obj, $entry_obj) use ($pdf_path, $form, $notification_ids){
-			if( $form_obj['id'] !== $form['id'] ) return $notification;
-			if( !in_array( $notification['id'] ?? '', $notification_ids, true ) ) return $notification;
-
-			if( !isset( $notification['attachments'] ) || ! is_array( $notification['attachments'] ) ){
-				$notification['attachments'] = [];
+	public static function cleanup_temp_attachments(): void {
+		foreach ( self::$temp_files as $file ) {
+			if ( file_exists( $file ) ) {
+				wp_delete_file( $file );
 			}
-
-			$notification['attachments'][] = $pdf_path;
-			return $notification;
-		}, 10, 3);
+		}
+		self::$temp_files = [];
 	}
 
 	/* -----------------------------------------------------------------------
@@ -332,6 +490,30 @@ class GFFPDF_Entry_Handler {
 			"SELECT * FROM {$wpdb->prefix}gffpdf_entries WHERE id = %d",
 			$id
 		) );
+	}
+
+	/**
+	 * Look up the most recent PDF record for this entry+feed whose file is
+	 * still actually present on disk. Used to avoid regenerating (and
+	 * duplicating) a PDF that already exists — see generate_and_store_pdf().
+	 */
+	private static function find_existing_pdf( int $entry_id, int $feed_id ): ?object {
+		if ( ! $entry_id || ! $feed_id ) {
+			return null;
+		}
+
+		global $wpdb;
+		$row = $wpdb->get_row( $wpdb->prepare(
+			"SELECT * FROM {$wpdb->prefix}gffpdf_entries WHERE entry_id = %d AND feed_id = %d AND pdf_path != '' ORDER BY generated_at DESC LIMIT 1",
+			$entry_id,
+			$feed_id
+		) );
+
+		if ( $row && file_exists( $row->pdf_path ) && GFFPDF_Security::is_safe_path( $row->pdf_path ) ) {
+			return $row;
+		}
+
+		return null;
 	}
 
 	/* -----------------------------------------------------------------------
@@ -385,7 +567,12 @@ class GFFPDF_Entry_Handler {
 		$errors    = [];
 
 		foreach ( $feeds as $feed ) {
-			$result = $this->process_feed( $feed, $entry, $form );
+			// Explicit admin-triggered regeneration must always rebuild from
+			// the entry's current data (e.g. after fixing a mapping or after
+			// the file was manually deleted) rather than being short-circuited
+			// by the "reuse existing PDF" optimisation used for automatic
+			// notification sends/resends.
+			$result = $this->process_feed( $feed, $entry, $form, true );
 
 			if ( is_wp_error( $result ) ) {
 				if ( $result->get_error_code() === 'conditional_logic' ) {

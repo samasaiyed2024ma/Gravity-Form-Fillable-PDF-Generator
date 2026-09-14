@@ -24,6 +24,18 @@ class GFFPDF_Feed_Settings {
 		add_action( 'wp_ajax_gffpdf_delete_font',    [ $this, 'ajax_delete_font' ] );
 		add_action( 'wp_ajax_gffpdf_get_notifications', [ $this, 'ajax_get_notifications' ] );
 
+		// Public PDF download link used inside notification emails (see
+		// shortcode_pdf_link()). Registered for BOTH logged-in and logged-out
+		// requests: the person opening the link from their email is almost
+		// always a non-admin, non-logged-in site visitor, so this must not
+		// require the plugin's admin capability the way the admin-only
+		// view/download actions in class-admin-menu.php do. Without the
+		// "nopriv" hook, WordPress' admin-ajax.php has no matching handler
+		// for a logged-out request and simply prints "0" — which is exactly
+		// the "opens a page that shows 0" symptom this fixes.
+		add_action( 'wp_ajax_gffpdf_public_download',        [ $this, 'ajax_public_download' ] );
+		add_action( 'wp_ajax_nopriv_gffpdf_public_download',  [ $this, 'ajax_public_download' ] );
+
 		// Shortocde: [gffpdf feed_id="1" entry_id="{entry_id}"]
 		add_shortcode( 'gffpdf', [ $this, 'shortcode_pdf_link' ] );
 	}
@@ -364,19 +376,109 @@ class GFFPDF_Feed_Settings {
 	}
 
 	/* -----------------------------------------------------------------------
+	 * Public (logged-out) PDF download link — used by the [gffpdf] shortcode
+	 * so it can be dropped into a Gravity Forms notification email body and
+	 * still work for the recipient, who is typically not logged into WP.
+	 * -------------------------------------------------------------------- */
+
+	/**
+	 * Generate a signed, session-independent token for a given PDF record.
+	 * Anyone holding pdf_id + this token can download that one PDF — no
+	 * login required — which is what makes the link usable from an email.
+	 * It never expires on its own; deleting the generated PDF (retention
+	 * cleanup, "Save Generated PDFs" disabled, manual delete) is what ends
+	 * access, same as the admin download links.
+	 */
+	private static function public_download_token( int $pdf_id, int $entry_id ): string {
+		return substr( hash_hmac( 'sha256', $pdf_id . '|' . $entry_id, wp_salt( 'auth' ) ), 0, 32 );
+	}
+
+	public function ajax_public_download(): void {
+		$pdf_id = absint( $_GET['pdf_id'] ?? 0 );
+		$token  = sanitize_text_field( wp_unslash( $_GET['token'] ?? '' ) );
+
+		$record = GFFPDF_Entry_Handler::get_pdf_record( $pdf_id );
+		if ( ! $record ) {
+			wp_die( esc_html__( 'PDF not found.', 'gf-fillable-pdf-generator' ), 404 );
+		}
+
+		$expected = self::public_download_token( $pdf_id, (int) $record->entry_id );
+		if ( ! $token || ! hash_equals( $expected, $token ) ) {
+			wp_die( esc_html__( 'This link is invalid.', 'gf-fillable-pdf-generator' ), 403 );
+		}
+
+		// The file behind this record may have been removed by the retention
+		// cleanup (see GFFPDF_File_Handler::run_scheduled_cleanup()) — that's
+		// intentional, it's what keeps the generated/ directory from growing
+		// unbounded on high-volume forms. Rather than dead-ending the visitor
+		// here, rebuild the PDF on the spot from the original entry data,
+		// template, and field mappings (all of which are kept indefinitely).
+		// This way the server never has to hold onto every PDF forever, but
+		// the download link itself never expires.
+		if ( empty( $record->pdf_path ) || ! file_exists( $record->pdf_path ) || ! GFFPDF_Security::is_safe_path( $record->pdf_path ) ) {
+			$fresh = $this->regenerate_for_download( $record );
+			if ( ! $fresh ) {
+				wp_die( esc_html__( 'This PDF is no longer available and could not be regenerated. Please contact the site owner.', 'gf-fillable-pdf-generator' ), 404 );
+			}
+			$record = $fresh;
+		}
+
+		GFFPDF_File_Handler::download_pdf( $record->pdf_path, basename( $record->pdf_path ) );
+	}
+
+	/**
+	 * Re-run PDF generation for a record whose file has since been deleted
+	 * (retention cleanup, "Save Generated PDFs" toggled off after the fact,
+	 * manual deletion, etc). Writes a brand new file + DB row rather than
+	 * touching the old one, so this stays consistent with how the daily
+	 * cleanup already handles missing files (clears pdf_path, keeps history).
+	 *
+	 * @return object|null Fresh record with a valid pdf_path, or null if the
+	 *                      entry/feed/template no longer exist to rebuild from.
+	 */
+	private function regenerate_for_download( object $record ): ?object {
+		$feed = self::get_feed( (int) $record->feed_id );
+		if ( ! $feed ) {
+			return null;
+		}
+
+		$entry = GFAPI::get_entry( (int) $record->entry_id );
+		if ( is_wp_error( $entry ) ) {
+			return null;
+		}
+
+		$form = GFAPI::get_form( (int) $record->form_id );
+		if ( ! $form ) {
+			return null;
+		}
+
+		$handler = new GFFPDF_Entry_Handler();
+		$result  = $handler->process_feed( $feed, $entry, $form );
+
+		if ( is_wp_error( $result ) ) {
+			GFFPDF_Logger::error( 'On-demand PDF regeneration failed for public download link', [
+				'pdf_id' => $record->id,
+				'reason' => $result->get_error_message(),
+			] );
+			return null;
+		}
+
+		return GFFPDF_Entry_Handler::get_pdf_record( $result );
+	}
+
+	/* -----------------------------------------------------------------------
 	 * Shortcode: [gffpdf feed_id="1" entry_id="123" label="Download PDF"]
 	 * -------------------------------------------------------------------- */
 	public function shortcode_pdf_link(array $atts): string{
 		$atts = shortcode_atts( [
 			'feed_id' => 0,
 			'entry_id' => 0,
-			'label' => __( 'Download PDF', 'gf-fillable-pdf-generator' ),
+			'label' => '',
 			'class' => 'gffpdf-shortcode-link',
 		], $atts, 'gffpdf' );
 
 		$feed_id = absint( $atts['feed_id'] );
 		$entry_id = absint( $atts['entry_id'] );
-		$label = esc_html( $atts['label'] );
 		$class = esc_attr( $atts['class'] );
 
 		if( ! $entry_id ){
@@ -405,11 +507,23 @@ class GFFPDF_Feed_Settings {
 			return '';
 		}
 
-		$nonce = GFFPDF_Security::create_nonce();
+		// Determine link label: use shortcode attribute if explicitly passed, otherwise use file name
+        $filename = basename( $record->pdf_path );
+        $label    = ! empty( $atts['label'] ) ? esc_html( $atts['label'] ) : esc_html( $filename );
+		
+		// A regular WP nonce (as used by the logged-in-only admin download
+		// links) is tied to the browser session that created it and expires
+		// within ~24 hours, so it can't be used here: this link is emailed
+		// to a site visitor who is not logged into wp-admin at all, and may
+		// open it days later from a different device. Instead we sign the
+		// link with an HMAC token scoped to this specific PDF record, which
+		// works for anyone holding the link without requiring a login or a
+		// WP user session — verified in ajax_public_download().
+		$token = self::public_download_token( (int) $record->id, (int) $record->entry_id );
 		$download_url = add_query_arg( [
-			'action' => 'gffpdf_download_pdf',
+			'action' => 'gffpdf_public_download',
 			'pdf_id' => $record->id,
-			'nonce' => $nonce,
+			'token'  => $token,
 		], admin_url( 'admin-ajax.php' ) );
 
 		return sprintf( 

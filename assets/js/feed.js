@@ -204,13 +204,17 @@
 
 					// ── Notifications ─────────────────────────────────────
 					$('.gffpdf-notification-cb').prop('checked', false);
-					const notifIds = (settings.notification_ids && Array.isArray(settings.notification_ids))
-						? settings.notification_ids
-						: [];
-					notifIds.forEach(function (id) {
-						$('.gffpdf-notification-cb[value="' + id + '"]').prop('checked', true);
-					});
+					const notifIds = (settings.notifications && Array.isArray(settings.notifications))
+						? settings.notifications
+						: ((settings.notification_ids && Array.isArray(settings.notification_ids)) ? settings.notification_ids : []);
 
+					// Map values to Strings so jQuery selector `.gffpdf-notification-cb[value="..."]` matches correctly
+					notifIds.map(String).forEach(function (id) {
+						$('.gffpdf-notification-cb').filter(function() {
+							return String($(this).val()) === id;
+						}).prop('checked', true);
+					});
+					
 					// ── Conditional logic ─────────────────────────────────
 					const cl = settings.conditional_logic || {};
 					const clEnabled = !!(cl.enabled);
@@ -299,6 +303,8 @@
 					template_path:           templatePath,
 					is_active:               $('#gffpdf-is-active').is(':checked') ? 1 : 0,
 					mappings_json:           JSON.stringify(mappings), // JSON.stringify turns JavaScript data structures into safe strings for database storage.
+					notifications:           notificationIds,            // Sent as standard array
+    				notifications_json:          JSON.stringify(notificationIds), // Sent as JSON string
 					notification_ids_json:   JSON.stringify(notificationIds),
 					conditional_logic_json:  JSON.stringify(conditionalLogic),
 					feed_settings: {
@@ -307,6 +313,7 @@
 						font_size:        fontSize,
 						font_color:       fontColor,
 						reverse_text:     reverseText,
+						notifications:    notificationIds,   // Included in feed_settings object
 					},
 				})
 				.done(function (res) {

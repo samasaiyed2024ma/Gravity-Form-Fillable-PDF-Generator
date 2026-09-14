@@ -221,25 +221,87 @@ class GFFPDF_PDF_Generator {
 			return;
 		}
 
+		// Draw as an image whenever the value actually resolves to one — not
+		// only when the PDF template's own AcroForm field happens to be typed
+		// as Signature (/Sig). Many real-world templates use a plain Text
+		// field as the visual "sign here" box, so relying on the template's
+		// field type alone misses those entirely and prints the raw image
+		// value as text instead. Checking the value itself covers both a
+		// signature URL (the standard Signature field / Add-On behaviour)
+		// and a base64 data URI (some canvas-based signature fields submit
+		// the image inline rather than uploading a file) — either way, if we
+		// treated it as text it would print a very long string that overflows
+		// its box and visually smears into whatever is printed next to it.
+		if ( $field_type === 'signature' || $this->looks_like_image_value( $value ) ) {
+			$this->draw_signature( $pdf, $left, $tcpdf_y, $field_w, $field_h, $value );
+			return;
+		}
+
 		$font_options = $this->resolve_font_options( $options, $font_size_pt );
-		$pdf->SetFont( $font_options['family'], '', $font_options['size'] );
+
+		// ── RTL / bidirectional text handling ───────────────────────────────
+		// Detect RTL characters (Arabic or Hebrew Unicode blocks) directly in
+		// the value itself and handle them automatically — this used to also
+		// require the feed's "Reverse Text" checkbox (or the global "RTL
+		// Support" toggle) to be turned on, which meant that with neither
+		// enabled, Hebrew/Arabic text stayed on a Latin-only core font and
+		// rendered as "?" characters (that font simply has no glyphs for
+		// those code points) even though the value was correct. Whether a
+		// font can *display* a character at all isn't an optional style
+		// choice, so this no longer waits for a manual toggle — it just
+		// checks the text itself. Purely Latin/English values are completely
+		// unaffected either way.
+		$is_rtl_text = $this->contains_rtl_characters( $value );
+
+		// The site's chosen/default font (e.g. 'helvetica', 'times', 'courier')
+		// is a core PDF font with only Latin/WinAnsi glyphs — it has no Arabic
+		// or Hebrew characters at all, so TCPDF renders missing glyphs as
+		// hollow boxes ("tofu") instead of the actual letters. When the value
+		// actually needs RTL rendering, swap to a bundled font that has the
+		// needed glyph coverage, unless the site has already picked a custom
+		// uploaded font (which the admin presumably chose because it supports
+		// their script).
+		$family = $font_options['family'];
+		if ( $is_rtl_text && ! $this->font_supports_rtl( $family ) ) {
+			$family = $this->rtl_fallback_font( $value );
+		}
+
+		$pdf->SetFont( $family, '', $font_options['size'] );
 		$pdf->SetTextColor( $font_options['r'], $font_options['g'], $font_options['b'] );
+
+		// Wrap across multiple lines whenever the value actually needs it —
+		// contains a line break, or is simply too long to fit the field's
+		// width on one line at its configured font size — rather than only
+		// for GF's "textarea"/Paragraph field type. That check turned out to
+		// be unreliable: $field_type here comes from the PDF TEMPLATE's own
+		// AcroForm field (almost always a plain "text" field, even when the
+		// GF field mapped to it is a Paragraph), not from Gravity Forms, so
+		// it never actually matched a real paragraph value. Checking the
+		// value itself works regardless of what kind of box the template
+		// used for it.
+		$avail_w      = max( 0.0, $field_w - 2 );
+		$needs_wrap   = $avail_w > 0 && ( strpos( $value, "\n" ) !== false || $pdf->GetStringWidth( $value ) > $avail_w );
+		if ( $field_type === 'textarea' || $needs_wrap ) {
+			$this->draw_multiline_text( $pdf, $left, $tcpdf_y, $field_w, $field_h, $value, $family, $font_options, $is_rtl_text );
+			return;
+		}
+
+		// Auto-shrink (never enlarge) the font just enough for the value to
+		// fit on one line within the field's own width. Without this, a
+		// value longer than its box (a long name, a full address, etc.)
+		// doesn't wrap or get clipped — Cell() just draws past the box's
+		// right edge and visually overlaps/smears into whatever the next
+		// field prints on the same line.
+		$fit_size  = $font_options['size'];
+		if ( $avail_w > 0 ) {
+			while ( $fit_size > 5.0 && $pdf->GetStringWidth( $value ) > $avail_w ) {
+				$fit_size -= 0.5;
+				$pdf->SetFont( $family, '', $fit_size );
+			}
+		}
 
 		$text_h_mm       = $font_size_pt * $pt;
 		$tcpdf_y_centred = $tcpdf_y + ( $field_h / 2 ) - ( $text_h_mm / 2 );
-
-		// ── RTL / bidirectional text handling ───────────────────────────────
-		// When "RTL Support" is enabled in the feed, check whether the value
-		// actually contains RTL characters (Arabic or Hebrew Unicode blocks).
-		// If it does, enable TCPDF's built-in bidi algorithm so the engine
-		// reorders RTL runs correctly while keeping embedded LTR text (e.g.
-		// English words or numbers) flowing left-to-right — exactly as the
-		// Unicode Bidirectional Algorithm specifies.
-		// If the value contains no RTL characters we leave everything as LTR
-		// so purely Latin/English text is never affected.
-
-		$rtl_enabled = ! empty( $options['reverse_text'] ); // option key kept for DB compat
-		$is_rtl_text = $rtl_enabled && $this->contains_rtl_characters( $value );
 
 		if ( $is_rtl_text ) {
 			// Turn on TCPDF's Unicode bidi reordering
@@ -253,6 +315,175 @@ class GFFPDF_PDF_Generator {
 			$pdf->SetXY( $left + 1, $tcpdf_y_centred );
 			$pdf->Cell( $field_w - 2, $text_h_mm, $value, 0, 0, 'L', false, '', 1 );
 		}
+	}
+
+	/**
+	 * Draw a Paragraph field's value wrapped across multiple lines within
+	 * its box, shrinking the font just enough for the text to fit the
+	 * box's height (never enlarging past the feed's configured size).
+	 */
+	private function draw_multiline_text( $pdf, float $left, float $top_y, float $field_w, float $field_h, string $value, string $family, array $font_options, bool $is_rtl_text ): void {
+		$avail_w  = max( 0.0, $field_w - 2 );
+		$fit_size = $font_options['size'];
+
+		// getStringHeight() reports how tall $value renders, wrapped to
+		// $avail_w, at the currently-set font size — shrink until it fits
+		// the box, same spirit as the single-line auto-shrink above but
+		// checking wrapped height instead of single-line width. Floor of
+		// 4pt (rather than the 5pt used for single-line fields) because a
+		// paragraph value that's still too tall at 5pt is common with long
+		// entries, and this is a flattened/rasterised PDF — there's no such
+		// thing as a scrollable field in the output, so the font is the
+		// only lever available to avoid losing text. If it's still taller
+		// than the box even at the floor, MultiCell doesn't clip it — the
+		// remaining lines simply print past the box's bottom edge, which is
+		// visually imperfect but never silently drops any of the value.
+		if ( $avail_w > 0 ) {
+			while ( $fit_size > 4.0 ) {
+				$pdf->SetFont( $family, '', $fit_size );
+				if ( $pdf->getStringHeight( $avail_w, $value ) <= $field_h ) {
+					break;
+				}
+				$fit_size -= 0.5;
+			}
+		}
+
+		if ( $is_rtl_text ) {
+			$pdf->setRTL( true );
+			$pdf->SetXY( $left + 1, $top_y );
+			$pdf->MultiCell( $avail_w, $field_h, $value, 0, 'R', false, 1, '', '', true, 0, false, true, $field_h, 'T' );
+			$pdf->setRTL( false );
+		} else {
+			$pdf->SetXY( $left + 1, $top_y );
+			$pdf->MultiCell( $avail_w, $field_h, $value, 0, 'L', false, 1, '', '', true, 0, false, true, $field_h, 'T' );
+		}
+	}
+
+	/**
+	 * Draw an actual signature image into a Signature-type PDF field.
+	 *
+	 * The Gravity Forms Signature field (and the core Signature Add-On) store
+	 * the signature as an image file and put its URL in the entry — not the
+	 * raw pixel data. Previously that URL string was passed straight into
+	 * Cell() and printed as text/a link. Here we resolve the URL to the file
+	 * on disk and embed the actual image, scaled to fit the field's
+	 * rectangle while preserving its aspect ratio (no stretching/distortion).
+	 */
+	private function draw_signature( $pdf, float $x, float $y, float $w, float $h, string $value ): void {
+		$value = trim( $value );
+		if ( $value === '' ) {
+			return;
+		}
+
+		// Some canvas-based signature fields submit the image inline as a
+		// base64 data URI instead of uploading a file to the server. There's
+		// no on-disk file to resolve in that case, so decode it to a
+		// short-lived temp file that gets cleaned up right after embedding.
+		$temp_file = null;
+		if ( preg_match( '#^data:image/(png|jpe?g|gif);base64,#i', $value, $m ) ) {
+			$raw = base64_decode( preg_replace( '#^data:image/\w+;base64,#i', '', $value ), true );
+			if ( $raw === false || $raw === '' ) {
+				GFFPDF_Logger::warn( 'Signature base64 data could not be decoded — skipping' );
+				return;
+			}
+			$ext        = strtolower( $m[1] ) === 'jpg' ? 'jpeg' : strtolower( $m[1] );
+			$temp_dir   = GFFPDF_UPLOAD_DIR . 'temp/';
+			if ( ! is_dir( $temp_dir ) ) {
+				wp_mkdir_p( $temp_dir );
+			}
+			$temp_file = $temp_dir . 'sig-' . uniqid( '', true ) . '.' . $ext;
+			file_put_contents( $temp_file, $raw );
+			$path = $temp_file;
+		} else {
+			$path = GFFPDF_Helpers::url_to_path( $value );
+		}
+
+		if ( ! $path ) {
+			GFFPDF_Logger::warn( 'Signature image could not be resolved to a local file — skipping', [ 'value' => $value ] );
+			return;
+		}
+
+		$size = @getimagesize( $path );
+		if ( ! $size ) {
+			GFFPDF_Logger::warn( 'Signature file is not a readable image — skipping', [ 'path' => $path ] );
+			if ( $temp_file ) {
+				wp_delete_file( $temp_file );
+			}
+			return;
+		}
+
+		$type_map = [ IMAGETYPE_PNG => 'PNG', IMAGETYPE_JPEG => 'JPG', IMAGETYPE_GIF => 'GIF' ];
+		$type     = $type_map[ $size[2] ] ?? '';
+
+		// Small inset so the signature doesn't touch the field's edges, and
+		// TCPDF's $fitbox parameter scales the image to fit inside the given
+		// box while keeping its original aspect ratio, centring it within
+		// the box on both axes ('CM' = centre horizontal, middle vertical).
+		$pad = 0.5; // mm
+		try {
+			$pdf->Image(
+				$path,
+				$x + $pad,
+				$y + $pad,
+				max( 0, $w - ( $pad * 2 ) ),
+				max( 0, $h - ( $pad * 2 ) ),
+				$type,
+				'', '', true, 300, '', false, false, 0, 'CM', false, false
+			);
+		} catch ( \Exception $e ) {
+			GFFPDF_Logger::warn( 'Failed to embed signature image', [ 'path' => $path, 'error' => $e->getMessage() ] );
+		} finally {
+			if ( $temp_file && file_exists( $temp_file ) ) {
+				wp_delete_file( $temp_file );
+			}
+		}
+	}
+
+	/**
+	 * True if $value is something that should be drawn as an image rather
+	 * than printed as text: either a base64 data URI, or a URL/path that
+	 * resolves to an actual file on disk.
+	 */
+	private function looks_like_image_value( string $value ): bool {
+		$value = trim( $value );
+		if ( $value === '' ) {
+			return false;
+		}
+		if ( preg_match( '#^data:image/(png|jpe?g|gif);base64,#i', $value ) ) {
+			return true;
+		}
+		return (bool) GFFPDF_Helpers::url_to_path( $value );
+	}
+
+	/**
+	 * Built-in TCPDF core fonts have no Arabic/Hebrew glyphs at all. Any font
+	 * NOT in this list is assumed to be either one of the bundled Unicode
+	 * fonts (which do carry those glyphs) or a custom TTF the admin uploaded
+	 * specifically to support their language — so we leave those alone and
+	 * only override the small set of Latin-only core fonts.
+	 */
+	private function font_supports_rtl( string $family ): bool {
+		$latin_only_core_fonts = [ 'helvetica', 'helveticab', 'helveticai', 'helveticabi',
+			'times', 'timesb', 'timesi', 'timesbi',
+			'courier', 'courierb', 'courieri', 'courierbi' ];
+		return ! in_array( strtolower( $family ), $latin_only_core_fonts, true );
+	}
+
+	/**
+	 * Pick a bundled TCPDF font that actually has glyphs for the script in
+	 * $value. 'aealarabiya' is TCPDF's dedicated Arabic font (correct glyph
+	 * joining/shaping); 'dejavusans' has solid Hebrew coverage. Both ship
+	 * with TCPDF, so no extra font installation is required.
+	 */
+	private function rtl_fallback_font( string $value ): string {
+		return $this->contains_arabic_characters( $value ) ? 'aealarabiya' : 'dejavusans';
+	}
+
+	private function contains_arabic_characters( string $text ): bool {
+		return (bool) preg_match(
+			'/[\x{0600}-\x{06FF}\x{0750}-\x{077F}\x{08A0}-\x{08FF}\x{FB50}-\x{FDFF}\x{FE70}-\x{FEFF}]/u',
+			$text
+		);
 	}
 
 	/**

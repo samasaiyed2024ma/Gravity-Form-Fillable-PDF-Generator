@@ -20,10 +20,16 @@ class GFFPDF_Helpers {
 		);
 
 		// {field:N} replacements
-		$filename = preg_replace_callback( '/\{field:(\d+)\}/', function( $m ) use ( $entry ) {
-			$val = isset( $entry[ $m[1] ] ) ? $entry[ $m[1] ] : '';
-			return sanitize_file_name( $val );
-		}, $filename );
+		// $filename = preg_replace_callback( '/\{field:(\d+)\}/', function( $m ) use ( $entry ) {
+		// 	$val = isset( $entry[ $m[1] ] ) ? $entry[ $m[1] ] : '';
+		// 	return sanitize_file_name( $val );
+		// }, $filename );
+
+		// Update \d+ to [\d.]+ to support sub-field IDs like 1.3 or 1.6
+$filename = preg_replace_callback( '/\{field:([\d.]+)\}/', function( $m ) use ( $entry ) {
+    $val = isset( $entry[ $m[1] ] ) ? $entry[ $m[1] ] : '';
+    return sanitize_file_name( $val );
+}, $filename );
 
 		// Sanitise the result
 		$filename = sanitize_file_name( $filename );
@@ -73,6 +79,100 @@ class GFFPDF_Helpers {
 			$upload_dir['baseurl'],
 			$path
 		);
+	}
+
+	/**
+	 * Resolve a value coming from a Gravity Forms field (typically a Signature
+	 * or File Upload field) to an absolute, on-disk file path.
+	 *
+	 * Accepts:
+	 *  - A full URL under this site's uploads directory (the normal case for
+	 *    Signature / File Upload fields, e.g. https://site.com/wp-content/uploads/gravity_forms/...png)
+	 *  - A protocol-relative URL (//site.com/...)
+	 *  - An already-absolute server path
+	 *
+	 * Returns null if the value can't be resolved to an existing, readable file.
+	 */
+	public static function url_to_path( string $value ): ?string {
+		$value = trim( $value );
+		if ( $value === '' ) {
+			return null;
+		}
+
+		// The Gravity Forms Signature Add-On does NOT store a URL or path in
+		// the entry for a signature field — just the bare generated filename
+		// (e.g. "6aa77c021392c6.41726212.png"). It always writes signature
+		// files to a single fixed folder — wp-content/uploads/gravity_forms/
+		// signatures/ (flat, not per-form like regular file uploads) — so we
+		// can build the on-disk path directly from that known convention.
+		//
+		// Deliberately NOT using gf_signature()->get_signature_url(): on
+		// Signature Add-On 4.0+ that returns a permission-gated, token/query-
+		// string URL (see GF_Signature_Image::get_url()) meant for browser
+		// access checks, not a plain static file URL — running it through the
+		// path matching below produced an empty match (the warning path
+		// "/var/www/html/" with nothing after it) because the real filename
+		// lives in the query string, which gets stripped before matching.
+		if ( strpos( $value, '/' ) === false && preg_match( '#\.(png|jpe?g|gif)$#i', $value ) ) {
+			$upload_dir     = wp_upload_dir();
+			$signature_path = trailingslashit( $upload_dir['basedir'] ) . 'gravity_forms/signatures/' . $value;
+			if ( file_exists( $signature_path ) && is_readable( $signature_path ) ) {
+				return $signature_path;
+			}
+		}
+
+		// Already an absolute local path.
+		if ( file_exists( $value ) && ! preg_match( '#^(https?:)?//#i', $value ) ) {
+			return is_readable( $value ) ? $value : null;
+		}
+
+		// Protocol-relative URL — assume same scheme as the site.
+		if ( strpos( $value, '//' ) === 0 ) {
+			$value = ( is_ssl() ? 'https:' : 'http:' ) . $value;
+		}
+
+		// Strip query string/fragment and decode %20 etc. BEFORE matching,
+		// so a signature URL like ".../signature.png?ver=123" or one with
+		// encoded spaces still lines up with the on-disk filename.
+		$value = rawurldecode( strtok( $value, '?#' ) );
+
+		$upload_dir = wp_upload_dir();
+		$candidates = [];
+
+		if ( strpos( $value, $upload_dir['baseurl'] ) === 0 ) {
+			$candidates[] = str_replace( $upload_dir['baseurl'], $upload_dir['basedir'], $value );
+		}
+
+		// Fall back to swapping the site's home URL for ABSPATH, in case the
+		// file lives outside the standard uploads directory (rare, but seen
+		// with some migrated/multisite installs).
+		$home = untrailingslashit( home_url() );
+		if ( strpos( $value, $home ) === 0 ) {
+			$candidates[] = ABSPATH . ltrim( substr( $value, strlen( $home ) ), '/' );
+		}
+
+		// Domain-agnostic fallback: match on the path *relative to*
+		// "wp-content/uploads/" wherever it appears in the value. This is
+		// what makes signature resolution survive the common real-world
+		// mismatches the two checks above miss entirely — a CDN/offloaded-
+		// media hostname, an http vs https scheme difference between when
+		// the signature was captured and now, the entry being regenerated
+		// from a staging URL that differs from the current site URL, or
+		// (unlike the checks above) a root-relative path with no scheme or
+		// host at all, e.g. "/wp-content/uploads/gravity_forms/...png" —
+		// which never matched here before since this whole method returned
+		// early unless the value already started with "http(s)://".
+		if ( preg_match( '#wp-content/uploads/(.+)$#i', $value, $m ) ) {
+			$candidates[] = trailingslashit( $upload_dir['basedir'] ) . ltrim( $m[1], '/' );
+		}
+
+		foreach ( $candidates as $path ) {
+			if ( $path && file_exists( $path ) && is_readable( $path ) ) {
+				return $path;
+			}
+		}
+
+		return null;
 	}
 
 	/**

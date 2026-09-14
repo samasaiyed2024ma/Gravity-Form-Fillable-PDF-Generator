@@ -4,8 +4,8 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 class GFFPDF_Deactivator {
  
 	public static function deactivate() {
+		wp_clear_scheduled_hook( 'gffpdf_daily_cleanup' );
 		flush_rewrite_rules();
-		// Optionally clear scheduled events here if any are added later
 	}
 
 	public static function cleanup_data(): void {

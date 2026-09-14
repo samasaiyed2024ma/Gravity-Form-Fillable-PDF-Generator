@@ -85,6 +85,19 @@
 							</td>
 						</tr>
 
+						<!-- PDF Retention -->
+						<tr>
+							<th scope="row">
+								<label for="gffpdf-retention-days"><?php esc_html_e( 'Auto-Delete Generated PDFs After', 'gf-fillable-pdf-generator' ); ?></label>
+							</th>
+							<td>
+								<input type="number" id="gffpdf-retention-days" name="retention_days"
+									value="<?php echo esc_attr( $settings['retention_days'] ); ?>" min="0" max="3650" class="small-text">
+								<?php esc_html_e( 'days', 'gf-fillable-pdf-generator' ); ?>
+								<p class="description"><?php esc_html_e( 'PDFs older than this are removed automatically by a daily cleanup task, so storage does not grow unbounded on high-volume sites. Set to 0 to keep generated PDFs forever.', 'gf-fillable-pdf-generator' ); ?></p>
+							</td>
+						</tr>
+
 						<!-- Flatten PDF -->
 						<!-- <tr>
 							<th scope="row"><?php esc_html_e( 'Flatten PDFs', 'gf-fillable-pdf-generator' ); ?></th>
@@ -106,6 +119,7 @@
 										<?php checked( $settings['rtl_support'] ); ?>>
 									<?php esc_html_e( 'Enable right-to-left text direction', 'gf-fillable-pdf-generator' ); ?>
 								</label>
+								<p class="description"><?php esc_html_e( 'Applies automatically and only to values that actually contain Arabic or Hebrew characters. Fields with English or other left-to-right text are never affected, even when this is enabled.', 'gf-fillable-pdf-generator' ); ?></p>
 							</td>
 						</tr>
 

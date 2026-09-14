@@ -60,7 +60,17 @@ class GFFPDF_Settings {
 			wp_send_json_error( [ 'message' => __( 'Invalid data.', 'gf-fillable-pdf-generator' ) ] );
 		}
 
-		$clean = GFFPDF_Security::sanitize_settings( $raw );
+		// Merge onto the currently-saved settings rather than sanitizing $raw
+		// in isolation. sanitize_settings() falls back to hard defaults (e.g.
+		// retention_days -> 0) for any key that isn't present, so if a single
+		// field ever arrives missing/blank in the POST body — an empty
+		// number input can submit as "" in some browsers, a slow network
+		// request, etc. — a full replace would silently wipe out every other
+		// already-configured setting back to its default, not just that one
+		// field. Merging means a missing/blank field keeps its last saved
+		// value instead of resetting.
+		$existing = self::get_settings();
+		$clean    = GFFPDF_Security::sanitize_settings( array_merge( $existing, $raw ) );
 		update_option( 'gffpdf_settings', $clean );
 
 		GFFPDF_Logger::info( 'Global settings saved' );
@@ -88,6 +98,7 @@ class GFFPDF_Settings {
 			'default_font_color'  => '#000000',
 			'filename_pattern'    => 'submission-{entry_id}-{date}',
 			'save_pdfs'           => true,
+			'retention_days'      => 0,
 			'enable_logs'         => true,
 			'flatten_pdf'         => true,
 			'rtl_support'         => false,

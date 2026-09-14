@@ -31,6 +31,7 @@
 					default_font_color: $('#gffpdf-font-color').val(),
 					filename_pattern: $('#gffpdf-filename-pattern').val(),
 					save_pdfs: $('#gffpdf-save-pdfs').is(':checked') ? 1 : 0,
+					retention_days: $('#gffpdf-retention-days').val(),
 					flatten_pdf: $('#gffpdf-flatten').is(':checked') ? 1 : 0,
 					rtl_support: $('#gffpdf-rtl').is(':checked') ? 1 : 0,
 					enable_logs: $('#gffpdf-logs').is(':checked') ? 1 : 0,

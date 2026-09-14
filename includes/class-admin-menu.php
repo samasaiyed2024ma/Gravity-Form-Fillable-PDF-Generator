@@ -227,7 +227,21 @@ class GFFPDF_Admin_Menu {
 			return $actions;
 		}
 
-		$pdf          = $pdfs[0];
+		// Most recent record with a file that's actually still on disk —
+		// older PDFs may have been removed by the storage cleanup schedule
+		// (see GFFPDF_File_Handler::run_scheduled_cleanup()), so don't link
+		// to a file that's no longer there.
+		$pdf = null;
+		foreach ( $pdfs as $candidate ) {
+			if ( ! empty( $candidate->pdf_path ) && file_exists( $candidate->pdf_path ) ) {
+				$pdf = $candidate;
+				break;
+			}
+		}
+		if ( ! $pdf ) {
+			return $actions; // Nothing currently available; use "Regenerate PDFs" on the entry detail page.
+		}
+
 		$nonce        = GFFPDF_Security::create_nonce();
 		$view_url     = add_query_arg( [ 'action' => 'gffpdf_view_pdf',     'pdf_id' => $pdf->id, 'nonce' => $nonce ], admin_url( 'admin-ajax.php' ) );
 		$download_url = add_query_arg( [ 'action' => 'gffpdf_download_pdf', 'pdf_id' => $pdf->id, 'nonce' => $nonce ], admin_url( 'admin-ajax.php' ) );
@@ -249,115 +263,112 @@ class GFFPDF_Admin_Menu {
 	 * -------------------------------------------------------------------- */
 
 	public function render_entry_detail_box( array $form, array $entry ): void {
-		$pdfs     = GFFPDF_Entry_Handler::get_entry_pdfs( $entry['id'] );
-		$entry_id = absint( $entry['id'] );
-		$regen_nonce = GFFPDF_Security::create_nonce( 'gffpdf_regenerate_' . $entry_id );
+        $pdfs     = GFFPDF_Entry_Handler::get_entry_pdfs( $entry['id'] );
+        $entry_id = absint( $entry['id'] );
+        $regen_nonce = GFFPDF_Security::create_nonce( 'gffpdf_regenerate_' . $entry_id );
 
-		echo '<div class="postbox gffpdf-entry-box">';
-		echo '<h3 class="hndle"><span>' . esc_html__( 'Fillable PDFs', 'gf-fillable-pdf-generator' ) . '</span></h3>';
-		echo '<div class="inside">';
+        // Filter list to keep only records where the file actually exists on disk
+        $existing_pdfs = array_filter( $pdfs, function( $pdf ) {
+            return ! empty( $pdf->pdf_path ) && file_exists( $pdf->pdf_path );
+        } );
 
-		echo '<div id="gffpdf-regen-notice" style="display:none;margin-bottom:8px;padding:8px 12px;border-radius:4px;font-size:13px;line-height:1.5;"></div>';
+        echo '<div class="postbox gffpdf-entry-box">';
+        echo '<h3 class="hndle"><span>' . esc_html__( 'Fillable PDFs', 'gf-fillable-pdf-generator' ) . '</span></h3>';
+        echo '<div class="inside">';
 
-		if ( empty( $pdfs ) ) {
-			echo '<p style="color:#666;font-style:italic;">' . esc_html__( 'No PDFs generated for this entry yet.', 'gf-fillable-pdf-generator' ) . '</p>';
-		} else {
-			echo '<ul class="gffpdf-pdf-list" id="gffpdf-pdf-list" style="margin:0 0 10px;padding:0;list-style:none;">';
-			foreach ( $pdfs as $pdf ) {
-				$nonce        = GFFPDF_Security::create_nonce();
-				$view_url     = add_query_arg( [ 'action' => 'gffpdf_view_pdf',     'pdf_id' => $pdf->id, 'nonce' => $nonce ], admin_url( 'admin-ajax.php' ) );
-				$download_url = add_query_arg( [ 'action' => 'gffpdf_download_pdf', 'pdf_id' => $pdf->id, 'nonce' => $nonce ], admin_url( 'admin-ajax.php' ) );
-				$name         = basename( $pdf->pdf_path );
-				$exists       = file_exists( $pdf->pdf_path );
+        echo '<div id="gffpdf-regen-notice" style="display:none;margin-bottom:8px;padding:8px 12px;border-radius:4px;font-size:13px;line-height:1.5;"></div>';
 
-				echo '<li style="padding:6px 0;border-bottom:1px solid #f0f0f0;">';
-				echo '<strong style="display:block;font-size:13px;">' . esc_html( $name ) . '</strong>';
-				if ( $exists ) {
-					echo '<a href="' . esc_url( $view_url ) . '" target="_blank" style="font-size:12px;">' . esc_html__( 'View', 'gf-fillable-pdf-generator' ) . '</a> &nbsp;';
-					echo '<a href="' . esc_url( $download_url ) . '" style="font-size:12px;">' . esc_html__( 'Download', 'gf-fillable-pdf-generator' ) . '</a>';
-				} else {
-					echo '<span style="font-size:12px;color:#dc2626;">⚠ ' . esc_html__( 'File missing', 'gf-fillable-pdf-generator' ) . '</span>';
-				}
-				echo '</li>';
-			}
-			echo '</ul>';
-		}
+        if ( empty( $existing_pdfs ) ) {
+            echo '<p style="color:#666;font-style:italic;">' . esc_html__( 'No PDFs generated for this entry yet.', 'gf-fillable-pdf-generator' ) . '</p>';
+        } else {
+            echo '<ul class="gffpdf-pdf-list" id="gffpdf-pdf-list" style="margin:0 0 10px;padding:0;list-style:none;">';
+            foreach ( $existing_pdfs as $pdf ) {
+                $nonce        = GFFPDF_Security::create_nonce();
+                $view_url     = add_query_arg( [ 'action' => 'gffpdf_view_pdf',     'pdf_id' => $pdf->id, 'nonce' => $nonce ], admin_url( 'admin-ajax.php' ) );
+                $download_url = add_query_arg( [ 'action' => 'gffpdf_download_pdf', 'pdf_id' => $pdf->id, 'nonce' => $nonce ], admin_url( 'admin-ajax.php' ) );
+                $name         = basename( $pdf->pdf_path );
 
-		// Regenerate button
-		echo '<p style="margin:10px 0 0;">';
-		echo '<button type="button" id="gffpdf-regen-btn" class="button button-secondary"';
-		echo ' data-entry-id="' . esc_attr( $entry_id ) . '"';
-		echo ' data-nonce="' . esc_attr( $regen_nonce ) . '"';
-		echo ' data-ajax-url="' . esc_url( admin_url( 'admin-ajax.php' ) ) . '">';
-		echo esc_html__( 'Regenerate PDFs', 'gf-fillable-pdf-generator' );
-		echo '</button>';
-		echo '</p>';
+                echo '<li style="padding:6px 0;border-bottom:1px solid #f0f0f0;">';
+                echo '<strong style="display:block;font-size:13px;">' . esc_html( $name ) . '</strong>';
+                echo '<a href="' . esc_url( $view_url ) . '" target="_blank" style="font-size:12px;">' . esc_html__( 'View', 'gf-fillable-pdf-generator' ) . '</a> &nbsp;';
+                echo '<a href="' . esc_url( $download_url ) . '" style="font-size:12px;">' . esc_html__( 'Download', 'gf-fillable-pdf-generator' ) . '</a>';
+                echo '</li>';
+            }
+            echo '</ul>';
+        }
 
-		?>
-		<script type="text/javascript">
-		(function($){
-			$('#gffpdf-regen-btn').on('click', function(){
-				var $btn    = $(this);
-				var $notice = $('#gffpdf-regen-notice');
-				var originalText = $btn.text();
+        // Regenerate button
+        echo '<p style="margin:10px 0 0;">';
+        echo '<button type="button" id="gffpdf-regen-btn" class="button button-secondary"';
+        echo ' data-entry-id="' . esc_attr( $entry_id ) . '"';
+        echo ' data-nonce="' . esc_attr( $regen_nonce ) . '"';
+        echo ' data-ajax-url="' . esc_url( admin_url( 'admin-ajax.php' ) ) . '">';
+        echo esc_html__( 'Regenerate PDFs', 'gf-fillable-pdf-generator' );
+        echo '</button>';
+        echo '</p>';
 
-				$btn.prop('disabled', true).text('<?php echo esc_js( __( 'Generating…', 'gf-fillable-pdf-generator' ) ); ?>');
-				$notice.hide().removeAttr('style');
+        ?>
+        <script type="text/javascript">
+        (function($){
+            $('#gffpdf-regen-btn').on('click', function(){
+                var $btn    = $(this);
+                var $notice = $('#gffpdf-regen-notice');
+                var originalText = $btn.text();
 
-				$.ajax({
-					url:      $btn.data('ajax-url'),
-					type:     'POST',
-					data: {
-						action:   'gffpdf_regenerate',
-						entry_id: $btn.data('entry-id'),
-						nonce:    $btn.data('nonce')
-					}
-				})
-				.done(function(res){
-					if (res && res.success) {
-						$notice
-							.css({ background: '#ecfdf5', color: '#065f46', border: '1px solid #a7f3d0', padding: '8px 12px', borderRadius: '4px', fontSize: '13px', marginBottom: '8px' })
-							.text(res.data.message)
-							.show();
-						var reloadDelay = (res.data && res.data.async) ? 5000 : 1500;
-						setTimeout(function(){ location.reload(); }, reloadDelay);
-					} else {
-						var msg = (res && res.data && res.data.message) 
-						? res.data.message 
-						: '<?php echo esc_js( __( 'PDF generation failed. Please check your feed settings.', 'gf-fillable-pdf-generator' ) ); ?>';
-						$notice
-							.css({ background: '#fef2f2', color: '#991b1b', border: '1px solid #fca5a5', padding: '8px 12px', borderRadius: '4px', fontSize: '13px', marginBottom: '8px', whiteSpace: 'pre-wrap', wordBreak: 'break-word' })
-							.text(msg)
-							.show();
-						$btn.prop('disabled', false).text(originalText);
-					}
-				})
-				.fail(function(xhr){
-					// Try to parse a JSON body from the error response
-					var msg;
-					try {
-						var res = JSON.parse(xhr.responseText);
-						msg = (res && res.data && res.data.message) ? res.data.message : 'Server error.';
-					} catch(e) {
-												// If we can't parse JSON, include the HTTP status to help debug
-						msg = xhr.responseText
-							? xhr.responseText.replace(/<[^>]+>/g, '').trim().substring(0, 500)
-							: 'No response received. Check your server error logs.';
-					}
-					$notice
-						.css({ background: '#fef2f2', color: '#991b1b', border: '1px solid #fca5a5', padding: '8px 12px', borderRadius: '4px', fontSize: '13px', marginBottom: '8px', whiteSpace: 'pre-wrap', wordBreak: 'break-word' })
-						.text(msg)
-						.show();
-					$btn.prop('disabled', false).text(originalText);
-				});
-			});
-		}(jQuery));
-		</script>
-		<?php
+                $btn.prop('disabled', true).text('<?php echo esc_js( __( 'Generating…', 'gf-fillable-pdf-generator' ) ); ?>');
+                $notice.hide().removeAttr('style');
 
-		echo '</div></div>';
-	}
+                $.ajax({
+                    url:      $btn.data('ajax-url'),
+                    type:     'POST',
+                    data: {
+                        action:   'gffpdf_regenerate',
+                        entry_id: $btn.data('entry-id'),
+                        nonce:    $btn.data('nonce')
+                    }
+                })
+                .done(function(res){
+                    if (res && res.success) {
+                        $notice
+                            .css({ background: '#ecfdf5', color: '#065f46', border: '1px solid #a7f3d0', padding: '8px 12px', borderRadius: '4px', fontSize: '13px', marginBottom: '8px' })
+                            .text(res.data.message)
+                            .show();
+                        var reloadDelay = (res.data && res.data.async) ? 5000 : 1500;
+                        setTimeout(function(){ location.reload(); }, reloadDelay);
+                    } else {
+                        var msg = (res && res.data && res.data.message) 
+                        ? res.data.message 
+                        : '<?php echo esc_js( __( 'PDF generation failed. Please check your feed settings.', 'gf-fillable-pdf-generator' ) ); ?>';
+                        $notice
+                            .css({ background: '#fef2f2', color: '#991b1b', border: '1px solid #fca5a5', padding: '8px 12px', borderRadius: '4px', fontSize: '13px', marginBottom: '8px', whiteSpace: 'pre-wrap', wordBreak: 'break-word' })
+                            .text(msg)
+                            .show();
+                        $btn.prop('disabled', false).text(originalText);
+                    }
+                })
+                .fail(function(xhr){
+                    var msg;
+                    try {
+                        var res = JSON.parse(xhr.responseText);
+                        msg = (res && res.data && res.data.message) ? res.data.message : 'Server error.';
+                    } catch(e) {
+                        msg = xhr.responseText
+                            ? xhr.responseText.replace(/<[^>]+>/g, '').trim().substring(0, 500)
+                            : 'No response received. Check your server error logs.';
+                    }
+                    $notice
+                        .css({ background: '#fef2f2', color: '#991b1b', border: '1px solid #fca5a5', padding: '8px 12px', borderRadius: '4px', fontSize: '13px', marginBottom: '8px', whiteSpace: 'pre-wrap', wordBreak: 'break-word' })
+                        .text(msg)
+                        .show();
+                    $btn.prop('disabled', false).text(originalText);
+                });
+            });
+        }(jQuery));
+        </script>
+        <?php
 
+        echo '</div></div>';
+    }
 	/* -----------------------------------------------------------------------
 	 * AJAX: stream / download
 	 * -------------------------------------------------------------------- */

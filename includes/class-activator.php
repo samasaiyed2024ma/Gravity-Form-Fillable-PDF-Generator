@@ -8,7 +8,14 @@ class GFFPDF_Activator {
 		self::create_tables();
 		self::create_directories();
 		self::set_defaults();
+		self::schedule_cleanup();
 		flush_rewrite_rules();
+	}
+
+	private static function schedule_cleanup() {
+		if ( ! wp_next_scheduled( 'gffpdf_daily_cleanup' ) ) {
+			wp_schedule_event( time(), 'daily', 'gffpdf_daily_cleanup' );
+		}
 	}
 
 	private static function check_requirements() {
@@ -108,6 +115,7 @@ class GFFPDF_Activator {
 				'default_font_color'  => '#000000',
 				'filename_pattern'    => 'submission-{entry_id}-{date}',
 				'save_pdfs'           => true,
+				'retention_days'      => 0,
 				'enable_logs'         => true,
 				'flatten_pdf'         => true,
 				'rtl_support'         => false,

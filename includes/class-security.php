@@ -90,10 +90,18 @@ class GFFPDF_Security {
 		$save_pdfs_raw = $settings['save_pdfs'] ?? null;
 		$save_pdfs     = ( $save_pdfs_raw === null ) ? true : (bool) $save_pdfs_raw;
 
-		// Sanitize notification IDs(array of integers)
+		// Sanitize notification IDs. NOTE: these are Gravity Forms notification
+		// IDs, which are alphanumeric hashes (e.g. "5f7d1e4b6a2c9"), NOT numeric
+		// field IDs — absint() would truncate them at the first non-digit
+		// character (e.g. "5f7d1e4b6a2c9" -> 5), silently corrupting every
+		// saved selection so it could never match a real notification ID again.
+		// That mismatch is why "Attach PDF to selected notifications" appeared
+		// to do nothing. Preserve the full string instead.
 		$notification_ids = [];
 		if(!empty($settings['notification_ids']) && is_array($settings['notification_ids'])){
-			$notification_ids = array_map('absint', $settings['notification_ids']);
+			$notification_ids = array_map( function( $id ) {
+				return sanitize_text_field( (string) $id );
+			}, $settings['notification_ids'] );
 		}
 
 		// Sanitize conditional logic rules
@@ -126,6 +134,7 @@ class GFFPDF_Security {
 			'default_font_color'  => sanitize_hex_color( $settings['default_font_color'] ?? '#000000' ) ?: '#000000',
 			'filename_pattern'    => sanitize_text_field( $settings['filename_pattern'] ?? 'submission-{entry_id}-{date}' ),
 			'save_pdfs'           => $save_pdfs,
+			'retention_days'      => absint( $settings['retention_days'] ?? 0 ),
 			'enable_logs'         => ! empty( $settings['enable_logs'] ),
 			'flatten_pdf'         => ! empty( $settings['flatten_pdf'] ),
 			'rtl_support'         => ! empty( $settings['rtl_support'] ),

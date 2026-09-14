@@ -108,6 +108,24 @@ class GFFPDF_File_Handler {
 	}
 
 	/**
+	 * Write a generated PDF blob to a short-lived temp file, used when
+	 * "Save Generated PDFs" is disabled but the PDF still needs to exist on
+	 * disk momentarily (e.g. to be attached to an outgoing notification email).
+	 * Callers are responsible for deleting the file once it's no longer needed.
+	 */
+	public static function save_temp( string $content, string $prefix = 'gffpdf-attach' ): string {
+		$dir = GFFPDF_UPLOAD_DIR . self::TEMP_DIR;
+		if ( ! is_dir( $dir ) ) {
+			wp_mkdir_p( $dir );
+		}
+
+		$path = $dir . $prefix . '-' . uniqid( '', true ) . '.pdf';
+		file_put_contents( $path, $content );
+
+		return $path;
+	}
+
+	/**
 	 * Get a public URL for a stored generated PDF.
 	 */
 	public static function get_pdf_url( string $path ): string {
@@ -181,5 +199,69 @@ class GFFPDF_File_Handler {
 				wp_delete_file( $file );
 			}
 		}
+	}
+
+	/* -----------------------------------------------------------------------
+	 * Scheduled retention cleanup for generated PDFs
+	 * -------------------------------------------------------------------- */
+
+	/**
+	 * Runs daily (see GFFPDF_Loader / gffpdf_daily_cleanup). Prevents the
+	 * generated/ directory from growing unbounded on high-volume sites:
+	 * stray temp files are always swept, and generated PDFs older than the
+	 * configured retention window have their file deleted. A retention of 0
+	 * (the default) keeps every generated PDF forever, matching the plugin's
+	 * previous behaviour.
+	 *
+	 * The DB record itself is kept (with pdf_path cleared) rather than
+	 * deleted, so the entry's PDF history and "Regenerate PDF" button in
+	 * Gravity Forms keep working — the entry meta box will simply show that
+	 * file as no longer available and let the admin regenerate it on demand.
+	 */
+	public static function run_scheduled_cleanup(): void {
+		// Safety net: catch any attachment-only temp files that somehow
+		// survived their end-of-request cleanup (e.g. a fatal error mid-request).
+		self::cleanup_temp( 24 );
+
+		$settings = GFFPDF_Settings::get_settings();
+		$days     = isset( $settings['retention_days'] ) ? absint( $settings['retention_days'] ) : 0;
+
+		if ( $days <= 0 ) {
+			return; // Keep generated PDFs forever.
+		}
+
+		global $wpdb;
+		$table  = $wpdb->prefix . 'gffpdf_entries';
+		$cutoff = gmdate( 'Y-m-d H:i:s', time() - ( $days * DAY_IN_SECONDS ) );
+
+		// The "pdf_path != ''" check skips rows already processed by a
+		// previous run, so this doesn't keep rescanning the same old rows
+		// forever once their file has been removed.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Batch maintenance query, not user-facing.
+		$old_rows = $wpdb->get_results( $wpdb->prepare(
+			"SELECT id, pdf_path FROM {$table} WHERE generated_at < %s AND pdf_path != ''",
+			$cutoff
+		) );
+
+		if ( empty( $old_rows ) ) {
+			return;
+		}
+
+		$deleted = 0;
+		foreach ( $old_rows as $row ) {
+			if ( ! empty( $row->pdf_path ) && GFFPDF_Security::is_safe_path( $row->pdf_path ) && file_exists( $row->pdf_path ) ) {
+				wp_delete_file( $row->pdf_path );
+			}
+			// Clear the path rather than deleting the row: keeps the entry's
+			// "PDF generated on <date>" history intact and lets the existing
+			// "File missing" UI + Regenerate button do their job.
+			$wpdb->update( $table, [ 'pdf_path' => '' ], [ 'id' => $row->id ], [ '%s' ], [ '%d' ] );
+			$deleted++;
+		}
+
+		GFFPDF_Logger::info( 'Scheduled cleanup removed old generated PDF files', [
+			'count'          => $deleted,
+			'retention_days' => $days,
+		] );
 	}
 }

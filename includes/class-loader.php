@@ -24,5 +24,13 @@ class GFFPDF_Loader{
         add_action('rest_api_init', function(){
            (new GFFPDF_REST_API())->register_routes();
         });
+
+        // Daily cleanup: sweeps stray temp files and, if a retention period
+        // is configured, prunes old generated PDFs so storage doesn't grow
+        // unbounded on high-volume sites.
+        add_action( 'gffpdf_daily_cleanup', [ 'GFFPDF_File_Handler', 'run_scheduled_cleanup' ] );
+        if ( ! wp_next_scheduled( 'gffpdf_daily_cleanup' ) ) {
+            wp_schedule_event( time(), 'daily', 'gffpdf_daily_cleanup' );
+        }
     }
 }

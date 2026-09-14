@@ -106,9 +106,21 @@
 						<?php if ( empty( $notifications ) ) : ?>
 							<p class="description"><?php esc_html_e( 'No notifications found for this form.', 'gf-fillable-pdf-generator' ); ?></p>
 						<?php else : ?>
+							<?php 
+							// Load saved notification IDs and ensure all array values are cast to strings
+							$saved_notifications = isset( $feed['settings']['notifications'] ) 
+								? (array) $feed['settings']['notifications'] 
+								: ( isset( $feed['meta']['notifications'] ) ? (array) $feed['meta']['notifications'] : array() );
+							
+							$saved_notifications = array_map( 'strval', $saved_notifications );
+							?>
 							<?php foreach ( $notifications as $notif ) : ?>
 								<label class="gffpdf-notification-item">
-									<input type="checkbox" class="gffpdf-notification-cb" value="<?php echo esc_attr( $notif['id'] ); ?>">
+									<input type="checkbox" 
+										name="gffpdf_notifications[]" 
+										class="gffpdf-notification-cb" 
+										value="<?php echo esc_attr( $notif['id'] ); ?>" 
+										<?php checked( in_array( (string) $notif['id'], $saved_notifications, true ) ); ?>>
 									<?php echo esc_html( $notif['name'] ); ?>
 								</label>
 							<?php endforeach; ?>
