@@ -306,7 +306,26 @@ class GFFPDF_PDF_Generator {
 		if ( $is_rtl_text ) {
 			// Turn on TCPDF's Unicode bidi reordering
 			$pdf->setRTL( true );
-			$pdf->SetXY( $left + 1, $tcpdf_y_centred );
+			// TCPDF's own RTL math (getCellCode()) treats the X you hand to
+			// SetXY() as the cell's TRAILING edge — i.e. its right edge —
+			// rather than its left edge, the opposite of what SetXY() means
+			// in normal LTR mode. Anchoring at $left (the box's actual left
+			// edge), like the LTR branch below does, right-aligns the text
+			// against that left-edge point instead of the box's real right
+			// edge, which is exactly what pulled RTL values toward the
+			// center/left of the field instead of hugging its right side.
+			// Anchoring at the box's right edge instead fixes that.
+			//
+			// SetXY()'s 3rd arg ($rtloff) matters too: with RTL on, SetXY()
+			// by default ALSO transforms whatever X you pass into
+			// ($this->w - $x) — a page-width-relative "logical" coordinate
+			// meant for RTL page layout — rather than using it as a direct
+			// physical position. That silently scrambles our mm coordinate
+			// into something unrelated to the field's real location. Passing
+			// true here keeps the X we computed as an actual physical
+			// coordinate; setRTL(true) above still keeps bidi text shaping
+			// active independently of this flag.
+			$pdf->SetXY( $left + $field_w - 1, $tcpdf_y_centred, true );
 			// 'R' alignment + bidi=true: TCPDF places RTL runs from right,
 			// LTR sub-runs (numbers, Latin words) automatically from left.
 			$pdf->Cell( $field_w - 2, $text_h_mm, $value, 0, 0, 'R', false, '', 1 );
@@ -350,7 +369,14 @@ class GFFPDF_PDF_Generator {
 
 		if ( $is_rtl_text ) {
 			$pdf->setRTL( true );
-			$pdf->SetXY( $left + 1, $top_y );
+			// Same RTL anchor-point quirk as the single-line branch in
+			// draw_field(): TCPDF's MultiCell() also treats the X passed to
+			// SetXY() as the box's right edge (not left) when RTL is on, so
+			// the anchor has to be the field's right side, not $left.
+			// Same $rtloff=true reasoning as draw_field(): without it,
+			// SetXY() rewrites our physical X into a page-width-relative
+			// value when RTL is on, instead of using it directly.
+			$pdf->SetXY( $left + $field_w - 1, $top_y, true );
 			$pdf->MultiCell( $avail_w, $field_h, $value, 0, 'R', false, 1, '', '', true, 0, false, true, $field_h, 'T' );
 			$pdf->setRTL( false );
 		} else {

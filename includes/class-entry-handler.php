@@ -38,6 +38,21 @@ class GFFPDF_Entry_Handler {
 		// this was the reason PDFs never showed up as attachments.
 		add_filter( 'gform_notification', [ $this, 'maybe_attach_pdf_to_notification' ], 10, 3 );
 
+		// Expand the [gffpdf] shortcode inside the outgoing email body.
+		// NOTE: this must NOT be done from the 'gform_notification' filter.
+		// Gravity Forms fires 'gform_notification' *before* it substitutes
+		// merge tags (e.g. {entry_id}) into the message — replace_variables()
+		// runs afterwards, inside send_notification(). A do_shortcode() call
+		// hooked to 'gform_notification' therefore sees the literal,
+		// unresolved text entry_id="{entry_id}", which absint()s to 0, so the
+		// shortcode function returns '' (its "no valid entry" case) — the
+		// link silently disappears instead of rendering.
+		// 'gform_pre_send_email' fires immediately before wp_mail(), once the
+		// subject/message have already had every merge tag substituted, which
+		// is what the shortcode's entry_id="{entry_id}" attribute needs to
+		// resolve to a real ID.
+		add_filter( 'gform_pre_send_email', [ $this, 'process_shortcodes_in_email' ], 10, 4 );
+
 		// Delete any attachment-only temp PDFs created during this request
 		// (used when "Save Generated PDFs" is disabled) once Gravity Forms
 		// has finished sending notifications and gform_after_submission has run.
@@ -445,6 +460,38 @@ class GFFPDF_Entry_Handler {
 	 * -------------------------------------------------------------------- */
 
 	/**
+	 * Expand a manually-typed [gffpdf] shortcode inside the final, fully
+	 * merge-tag-resolved email body into its actual download-link HTML.
+	 *
+	 * Gravity Forms never runs do_shortcode() on notification content itself
+	 * — only WordPress' 'the_content' filter (post/page rendering) does that
+	 * automatically. Without this, [gffpdf entry_id="{entry_id}"] pasted into
+	 * a notification message is sent out verbatim as plain text. This must be
+	 * hooked to 'gform_pre_send_email' rather than 'gform_notification' — see
+	 * the note where it's registered in the constructor for why.
+	 *
+	 * @param array  $email           Keys include 'to', 'subject', 'message',
+	 *                                'headers', 'attachments', etc.
+	 * @param string $message_format  'html' or 'text'.
+	 */
+	public function process_shortcodes_in_email( $email, $message_format, $notification, $entry ) {
+		if ( empty( $email['message'] ) || ! is_string( $email['message'] ) || strpos( $email['message'], '[gffpdf' ) === false ) {
+			return $email;
+		}
+
+		$expanded = do_shortcode( $email['message'] );
+
+		// Plain-text notifications would otherwise show the raw
+		// <a href="...">label</a> markup verbatim; fall back to a bare URL.
+		if ( 'text' === $message_format ) {
+			$expanded = preg_replace( '/<a\s+href="([^"]+)"[^>]*>.*?<\/a>/i', '$1', $expanded );
+		}
+
+		$email['message'] = $expanded;
+		return $email;
+	}
+
+	/**
 	 * Attach generated PDFs to a Gravity Forms notification as it's being sent.
 	 *
 	 * Hooked unconditionally in the constructor (see the note there on why —
@@ -467,9 +514,16 @@ class GFFPDF_Entry_Handler {
 			$settings = json_decode( $feed->settings, true ) ?? [];
 			$selected = $settings['notification_ids'] ?? [];
 
-			$wants_this_notification = ( ! empty( $selected ) && is_array( $selected ) )
-				? in_array( $notification_id, array_map( 'strval', $selected ), true )
-				: ! empty( $settings['attach_to_email'] );
+			// AFTER (Fixed fallback logic)
+			$selected_ids = array_filter( array_map( 'strval', (array) $selected ) );
+
+			if ( ! empty( $selected_ids ) ) {
+				// Specific notifications are checked
+				$wants_this_notification = in_array( (string) $notification_id, $selected_ids, true );
+			} else {
+				// Fallback: Attach to all notifications if attach_to_email is enabled
+				$wants_this_notification = ! empty( $settings['attach_to_email'] );
+			}
 
 			if ( ! $wants_this_notification ) {
 				GFFPDF_Logger::info( 'Notification attach skipped: not selected for this feed', [
@@ -528,9 +582,21 @@ class GFFPDF_Entry_Handler {
 
 	public static function save_pdf_record( int $entry_id, int $form_id, int $feed_id, string $pdf_path ): int {
 		global $wpdb;
+		$table = $wpdb->prefix . 'gffpdf_entries';
 
+		// Delete existing record for this entry and feed to prevent duplicates
+		$wpdb->delete(
+			$table,
+			[
+				'entry_id' => $entry_id,
+				'feed_id'  => $feed_id,
+			],
+			[ '%d', '%d' ]
+		);
+
+		// Insert fresh record
 		$wpdb->insert(
-			$wpdb->prefix . 'gffpdf_entries',
+			$table,
 			[
 				'entry_id'     => $entry_id,
 				'form_id'      => $form_id,
@@ -546,8 +612,19 @@ class GFFPDF_Entry_Handler {
 
 	public static function get_entry_pdfs( int $entry_id ): array {
 		global $wpdb;
+		$table = $wpdb->prefix . 'gffpdf_entries';
+
+		// Group by feed_id to return only 1 file per feed
 		return $wpdb->get_results( $wpdb->prepare(
-			"SELECT * FROM {$wpdb->prefix}gffpdf_entries WHERE entry_id = %d ORDER BY generated_at DESC",
+			"SELECT e1.* 
+			FROM {$table} e1
+			INNER JOIN (
+				SELECT MAX(id) as max_id 
+				FROM {$table} 
+				WHERE entry_id = %d 
+				GROUP BY feed_id
+			) e2 ON e1.id = e2.max_id
+			ORDER BY e1.generated_at DESC",
 			$entry_id
 		) );
 	}
