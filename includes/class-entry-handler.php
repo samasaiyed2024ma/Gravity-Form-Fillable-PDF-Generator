@@ -316,38 +316,110 @@ class GFFPDF_Entry_Handler {
 	private function build_field_values( array $mappings, array $entry, array $form ): array {
 		$values = [];
 
-		// Build a quick lookup of field type AND sub-field inputs by field ID.
-		// Keys are stored as strings to match how rgar() keys the entry array.
-		$field_types  = [];
-		$field_inputs = []; // sub-field inputs e.g. Name, Address
+		$field_objects = [];
 		if ( ! empty( $form['fields'] ) ) {
 			foreach ( $form['fields'] as $field ) {
-				$id_str               = (string) $field->id;
-				$field_types[ $id_str ] = $field->type;
+				$id_str = (string) $field->id;
+				$field_objects[ $id_str ] = $field;
 
-				// Register sub-field IDs (e.g. 1.3, 1.6) with the parent type
 				if ( ! empty( $field->inputs ) && is_array( $field->inputs ) ) {
 					foreach ( $field->inputs as $input ) {
-						$field_types[ (string) $input['id'] ] = $field->type;
+						$field_objects[ (string) $input['id'] ] = $field;
 					}
 				}
 			}
 		}
 
 		foreach ( $mappings as $pdf_field => $gf_field_id ) {
-			// Skip unmapped fields (saved as 0 or empty string)
 			if ( $gf_field_id === '' || $gf_field_id === 0 || $gf_field_id === '0' ) {
 				continue;
 			}
 
-			// Use string key — both rgar() and our lookup use string keys
-			$gf_field_id = (string) $gf_field_id;
-			$raw_value   = rgar( $entry, $gf_field_id );
-			$field_type  = $field_types[ $gf_field_id ] ?? 'text'; // Bug fix: was (int) key
+			$gf_field_id_str = (string) $gf_field_id;
 
+			// 1. Checkbox Choice Match Target (e.g. "4:Option A")
+			if ( strpos( $gf_field_id_str, ':' ) !== false ) {
+				list( $real_id, $target_choice ) = explode( ':', $gf_field_id_str, 2 );
+				$submitted_val = rgar( $entry, $real_id );
+				
+				if ( empty( $submitted_val ) ) {
+					foreach ( $entry as $k => $v ) {
+						if ( strpos( (string) $k, $real_id . '.' ) === 0 && (string) $v === (string) $target_choice ) {
+							$submitted_val = $v;
+							break;
+						}
+					}
+				}
+
+				$values[ $pdf_field ] = ( (string) $submitted_val === (string) $target_choice ) ? 'Yes' : '';
+				continue;
+			}
+
+			// 2. Specific List Field Cell Match (e.g. "12.row0.col1" or "12.row0")
+			if ( preg_match( '/^(\d+)\.row(\d+)(?:\.col(\d+))?$/', $gf_field_id_str, $matches ) ) {
+				$base_field_id = $matches[1];
+				$row_index     = (int) $matches[2];
+				$col_index     = isset( $matches[3] ) ? (int) $matches[3] : null;
+
+				$list_raw  = rgar( $entry, $base_field_id );
+				$list_data = maybe_unserialize( $list_raw );
+
+				if ( is_array( $list_data ) && isset( $list_data[ $row_index ] ) ) {
+					$row_data = $list_data[ $row_index ];
+
+					if ( is_array( $row_data ) ) {
+						if ( $col_index !== null ) {
+							// Multi-column row cell: fetch specific column by key or index
+							$col_keys = array_keys( $row_data );
+							$target_key = $col_keys[ $col_index ] ?? $col_index;
+							$values[ $pdf_field ] = (string) ( $row_data[ $target_key ] ?? '' );
+						} else {
+							// Single-column row: join values
+							$values[ $pdf_field ] = implode( ' | ', array_filter( $row_data ) );
+						}
+					} else {
+						$values[ $pdf_field ] = (string) $row_data;
+					}
+				} else {
+					$values[ $pdf_field ] = '';
+				}
+				continue;
+			}
+
+			$field_obj  = $field_objects[ $gf_field_id_str ] ?? null;
+			$field_type = $field_obj ? $field_obj->type : 'text';
+
+			// 3. Parent Composite Field Handling (e.g. ID "10")
+			$raw_value = rgar( $entry, $gf_field_id_str );
+			
+			if ( empty( $raw_value ) && $field_obj && ! empty( $field_obj->inputs ) && strpos( $gf_field_id_str, '.' ) === false ) {
+				$sub_vals = [];
+				foreach ( $field_obj->inputs as $input ) {
+					$val = rgar( $entry, (string) $input['id'] );
+					if ( ! empty( $val ) ) {
+						$sub_vals[] = $val;
+					}
+				}
+				$raw_value = implode( ' ', $sub_vals );
+			}
+
+			// 4. Format standard Field Types
 			switch ( $field_type ) {
 				case 'checkbox':
 					$values[ $pdf_field ] = GFFPDF_PDF_Generator::normalise_checkbox( $raw_value );
+					break;
+
+				case 'list':
+					$list_data = maybe_unserialize( $raw_value );
+					if ( is_array( $list_data ) ) {
+						$rows = [];
+						foreach ( $list_data as $row ) {
+							$rows[] = is_array( $row ) ? implode( ' | ', array_filter( $row ) ) : $row;
+						}
+						$values[ $pdf_field ] = implode( "\n", array_filter( $rows ) );
+					} else {
+						$values[ $pdf_field ] = (string) $raw_value;
+					}
 					break;
 
 				case 'date':
@@ -358,9 +430,6 @@ class GFFPDF_Entry_Handler {
 
 				case 'fileupload':
 				case 'signature':
-					// Store the URL/path as-is — resolved to an actual file
-					// (and, for signatures, embedded as an image) later in
-					// GFFPDF_PDF_Generator, not printed as text/a link.
 					$values[ $pdf_field ] = $raw_value;
 					break;
 
@@ -371,7 +440,6 @@ class GFFPDF_Entry_Handler {
 
 		return $values;
 	}
-
 	/* -----------------------------------------------------------------------
 	 * Email attachment
 	 * -------------------------------------------------------------------- */

@@ -642,48 +642,138 @@ class GFFPDF_Feed_Settings {
 	 * GF fields helper
 	 * -------------------------------------------------------------------- */
 
-	private function get_gf_fields( array $form ): array {
-		if ( empty( $form['fields'] ) ) return [];
+private function get_gf_fields( array $form ): array {
+    if ( empty( $form['fields'] ) ) return [];
 
-		// Field types that carry a fixed set of choices
-		$choice_types = ['select', 'radio', 'checkbox', 'multiselect', 'list'];
+    $fields = [];
+    foreach ( $form['fields'] as $field ) {
+        
+        $field_label = ! empty( $field->label ) ? $field->label : 'Field ' . $field->id;
 
-		$fields = [];
-		foreach ( $form['fields'] as $field ) {
-			// Collect choices for option-based field types
-			$choices = [];
-			if(in_array($field->type, $choice_types, true) && !empty($field->choices) && is_array($field->choices)){
-				foreach($field->choices as $choice){
-					if(isset($choice['value'])){
-						$choices[] = [
-							'value' => $choice['value'],
-							'text' => $choice['text'] ?? $choice['value'],
-						];
-					}
-				}
-			}
+        // 1. List Field Matrix Breakdown
+        if ( $field->type === 'list' ) {
+            $fields[] = [
+                'id'      => (string) $field->id,
+                'label'   => $field_label . ' (Combined / All Rows)',
+                'type'    => $field->type,
+                'choices' => [],
+            ];
 
-			$fields[] = [
-				'id'    => $field->id,
-				'label' => $field->label,
-				'type'  => $field->type,
-				'choices' => $choices,
-			];
+            $columns = $field->choices ?? [];
+            if ( empty( $columns ) && ! empty( $field->columns ) ) {
+                $columns = $field->columns;
+            }
 
-			// Sub-fields (e.g. Name, Address)
-			if ( ! empty( $field->inputs ) && is_array( $field->inputs ) ) {
-				foreach ( $field->inputs as $input ) {
-					if ( ! empty( $input['label'] ) ) {
-						$fields[] = [
-							'id'    => $input['id'],
-							'label' => $field->label . ' (' . $input['label'] . ')',
-							'type'  => $field->type,
-							'choice' => [], // sub-fields don't have their own choices
-						];
-					}
-				}
-			}
-		}
-		return $fields;
-	}
+            $max_rows = 10;
+            if ( ! empty( $columns ) && is_array( $columns ) ) {
+                for ( $r = 0; $r < $max_rows; $r++ ) {
+                    $row_num = $r + 1;
+                    foreach ( $columns as $c_idx => $col ) {
+                        $col_name = is_array( $col ) ? ( $col['text'] ?? $col['value'] ) : $col;
+                        $key = $field->id . '.row' . $r . '.col' . $c_idx;
+
+                        $fields[] = [
+                            'id'      => $key,
+                            'label'   => $field_label . " → Row {$row_num}: {$col_name}",
+                            'type'    => 'list_cell',
+                            'choices' => [],
+                        ];
+                    }
+                }
+            } else {
+                for ( $r = 0; $r < $max_rows; $r++ ) {
+                    $row_num = $r + 1;
+                    $key = $field->id . '.row' . $r;
+
+                    $fields[] = [
+                        'id'      => $key,
+                        'label'   => $field_label . " → Row {$row_num}",
+                        'type'    => 'list_cell',
+                        'choices' => [],
+                    ];
+                }
+            }
+            continue;
+        }
+
+        // 2. Radio, Checkbox, Select, & Consent Fields (With choices & sub-inputs)
+        $has_choices = ! empty( $field->choices ) && is_array( $field->choices );
+        $has_inputs  = ! empty( $field->inputs ) && is_array( $field->inputs );
+
+        if ( in_array( $field->type, [ 'radio', 'checkbox', 'select', 'consent' ], true ) || $has_choices ) {
+            // Main selected value
+            $fields[] = [
+                'id'      => (string) $field->id,
+                'label'   => $field_label . ' (Selected Value)',
+                'type'    => $field->type,
+                'choices' => [],
+            ];
+
+            // Add sub-inputs (for checkboxes where each option has its own ID like 15.1, 15.2)
+            if ( $has_inputs ) {
+                foreach ( $field->inputs as $input ) {
+                    if ( ! empty( $input['isHidden'] ) ) {
+                        continue;
+                    }
+                    $input_label = ! empty( $input['label'] ) ? $input['label'] : $input['id'];
+                    $fields[] = [
+                        'id'      => (string) $input['id'],
+                        'label'   => $field_label . ' (' . $input_label . ')',
+                        'type'    => $field->type,
+                        'choices' => [],
+                    ];
+                }
+            }
+
+            // Add choice-specific targets (e.g., 15:Yes, 15:No, 15:Disciplinary reasons?)
+            if ( $has_choices ) {
+                foreach ( $field->choices as $choice ) {
+                    $choice_val  = $choice['value'] ?? $choice['text'];
+                    $choice_text = $choice['text'] ?? $choice['value'];
+                    
+                    $fields[] = [
+                        'id'      => $field->id . ':' . $choice_val,
+                        'label'   => $field_label . ' → Choice: ' . $choice_text,
+                        'type'    => $field->type . '_choice',
+                        'choices' => [],
+                    ];
+                }
+            }
+            continue;
+        }
+        
+        // 3. Complex/Composite Fields (Name, Address, etc.)
+        if ( $has_inputs ) {
+            $fields[] = [
+                'id'      => (string) $field->id,
+                'label'   => $field_label . ' (Full Value)',
+                'type'    => $field->type,
+                'choices' => [],
+            ];
+
+            foreach ( $field->inputs as $input ) {
+                if ( ! empty( $input['isHidden'] ) ) {
+                    continue;
+                }
+                $fields[] = [
+                    'id'      => (string) $input['id'],
+                    'label'   => $field_label . ' (' . ( $input['label'] ?? $input['id'] ) . ')',
+                    'type'    => $field->type,
+                    'choices' => [],
+                ];
+            }
+            continue;
+        } 
+
+        // 4. Standard Text / Date / Paragraph Fields
+        $fields[] = [
+            'id'      => (string) $field->id,
+            'label'   => $field_label,
+            'type'    => $field->type,
+            'choices' => [],
+        ];
+    }
+
+    return $fields;
+}
 }
