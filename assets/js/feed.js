@@ -5,6 +5,7 @@
 	const Feed = {
 
 		currentFeedId: null,
+		listNeedsRefresh: false,
 
 		init: function () {
 			this.bindAddFeed();
@@ -147,6 +148,14 @@
 		 * ------------------------------------------------------------- */
 		bindEditorCancel: function () {
 			$(document).on('click', '#gffpdf-editor-back, #gffpdf-editor-cancel-bottom', function () {
+				// If a save happened while we were in the editor, the feed
+				// list rendered on page load is now stale — reload so it
+				// picks up the change. Otherwise (just browsing/cancelling)
+				// switch views instantly with no reload.
+				if (Feed.listNeedsRefresh) {
+					location.reload();
+					return;
+				}
 				Feed.closeEditor();
 			});
 		},
@@ -319,8 +328,26 @@
 				.done(function (res) {
 					if (res.success) {
 						Feed.showNotice(GFFPDF.strings.saved, 'success');
-						Feed.closeEditor();
-						setTimeout(function () { location.reload(); }, 600);
+
+						// Stay on the editor after save (don't drop back to the
+						// feed list). If this was a brand-new feed, the server
+						// has now assigned it a real ID — adopt it so a second
+						// click on "Save Feed" updates this feed instead of
+						// creating a duplicate, and so the editor reflects that
+						// it's now editing an existing feed.
+						if (res.data && res.data.feed_id) {
+							Feed.currentFeedId = res.data.feed_id;
+							$('#gffpdf-feed-id').val(res.data.feed_id);
+							$('#gffpdf-editor-title').text('Edit Feed');
+							$('#gffpdf-shortcode-display').text('[gffpdf feed_id="' + res.data.feed_id + '" entry_id="{entry_id}"]');
+							$('#gffpdf-shortcode-row').show();
+						}
+
+						// The feed list underneath is now stale; mark it so
+						// Back/Cancel refreshes the page instead of just
+						// toggling the view, ensuring the list is accurate
+						// whenever the user does navigate back to it.
+						Feed.listNeedsRefresh = true;
 					} else {
 						Feed.showNotice(res.data.message || GFFPDF.strings.error, 'error');
 					}
