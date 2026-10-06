@@ -79,7 +79,7 @@ class GFFPDF_Feed_Settings {
 				'name' => $n['name'] ?? $id,
 			];
 		}, array_keys( $form['notifications'] ), $form['notifications'] ) : [];
-		$all_fonts = GFFPDF_Font_Manager::get_all_fonts();
+		$gffpdf_all_fonts = GFFPDF_Font_Manager::get_all_fonts();
 
 		wp_enqueue_media();
 		$this->enqueue_feed_assets( $form_id );
