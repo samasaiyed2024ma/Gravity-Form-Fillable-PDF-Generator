@@ -151,6 +151,20 @@ class GFFPDF_Entry_Handler {
 		$feed_id  = (int) $feed->id;
 		$entry_id = (int) ( $entry['id'] ?? 0 );
 
+		// --- Conditional logic (checked FIRST) ---
+		// This must run before the "reuse an existing PDF" shortcut below.
+		// Otherwise a PDF generated earlier — when the entry still matched the
+		// rules — would keep being attached to notifications after the entry
+		// was edited so that it no longer matches.
+		$settings = json_decode( $feed->settings, true ) ?? [];
+		if ( ! $this->passes_conditional_logic( $settings, $entry, $form ) ) {
+			GFFPDF_Logger::info( 'Feed skipped: conditional logic', [ 'feed_id' => $feed_id, 'entry_id' => $entry_id ] );
+			return array_merge( $empty_result, [ 'error' => new WP_Error( 'conditional_logic',
+				// translators: %s: The name of the feed config.
+				sprintf( __( 'Feed "%s": skipped — conditional logic rules not met for this entry.', 'gf-fillable-pdf-generator' ), $feed->feed_name )
+			) ] );
+		}
+
 		// Reuse an already-generated, still-on-disk PDF for this entry+feed
 		// instead of generating a fresh one. Without this, every time an
 		// admin uses Gravity Forms' "Resend Notifications" action (which
@@ -192,15 +206,6 @@ class GFFPDF_Entry_Handler {
 			return array_merge( $empty_result, [ 'error' => new WP_Error( 'no_mappings',
 				// translators: %s: The name of the feed config.
 				sprintf( __( 'Feed "%s": no field mappings configured — please map at least one PDF field to a form field.', 'gf-fillable-pdf-generator' ), $feed->feed_name )
-			) ] );
-		}
-
-		// --- Conditional logic ---
-		if ( ! $this->passes_conditional_logic( $settings, $entry, $form ) ) {
-			GFFPDF_Logger::info( 'Feed skipped: conditional logic', [ 'feed_id' => $feed_id, 'entry_id' => $entry['id'] ] );
-			return array_merge( $empty_result, [ 'error' => new WP_Error( 'conditional_logic',
-				// translators: %s: The name of the feed config.
-				sprintf( __( 'Feed "%s": skipped — conditional logic rules not met for this entry.', 'gf-fillable-pdf-generator' ), $feed->feed_name )
 			) ] );
 		}
 
@@ -304,6 +309,7 @@ class GFFPDF_Entry_Handler {
 			case 'is':
 				return $actual === $expected;
 			case 'isnot':
+			case 'is_not':
 				return $actual !== $expected;
 			case 'greater_than':
 				return is_numeric( $actual ) && is_numeric( $expected ) && (float) $actual > (float) $expected;
