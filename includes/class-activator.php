@@ -14,7 +14,7 @@ class GFFPDF_Activator {
 
 	private static function schedule_cleanup() {
 		if ( ! wp_next_scheduled( 'gffpdf_daily_cleanup' ) ) {
-			wp_schedule_event( time(), 'daily', 'gffpdf_daily_cleanup' );
+			wp_schedule_event( time() + 60, 'hourly', 'gffpdf_daily_cleanup' );
 		}
 	}
 

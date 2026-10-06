@@ -53,9 +53,14 @@ class GFFPDF_Settings {
 	}
 
 	public function ajax_save_settings(): void {
-		check_ajax_referer( 'gffpdf_nonce', 'nonce' );
-		
-		// phpcs:ignore WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Verified by GFFPDF_Security::check_ajax(); settings sanitized downstream.		$raw = isset( $_POST['settings'] ) ? wp_unslash( $_POST['settings'] ) : [];
+		// The page's nonce is created with GFFPDF_Security::create_nonce()
+		// (action NONCE_AJAX), so it must be verified with the same action —
+		// this also enforces the capability check. The old check_ajax_referer(
+		// 'gffpdf_nonce' ) used a different action, always failed with a 403,
+		// and the browser showed "Request failed".
+		GFFPDF_Security::check_ajax();
+
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Verified by GFFPDF_Security::check_ajax(); settings sanitized downstream.
 		$raw = isset( $_POST['settings'] ) ? wp_unslash( $_POST['settings'] ) : [];
 		if ( ! is_array( $raw ) ) {
 			wp_send_json_error( [ 'message' => __( 'Invalid data.', 'gf-fillable-pdf-generator' ) ] );
@@ -75,6 +80,16 @@ class GFFPDF_Settings {
 		update_option( 'gffpdf_settings', $clean );
 
 		GFFPDF_Logger::info( 'Global settings saved' );
+
+		// Apply a retention period straight away instead of waiting for the
+		// next cron tick (WP-Cron only fires when the site gets a visit).
+		if ( ! empty( $clean['retention_days'] ) ) {
+			try {
+				GFFPDF_File_Handler::run_scheduled_cleanup();
+			} catch ( \Throwable $e ) {
+				GFFPDF_Logger::error( 'Cleanup after settings save failed', [ 'error' => $e->getMessage() ] );
+			}
+		}
 		wp_send_json_success( [ 'message' => __( 'Settings saved.', 'gf-fillable-pdf-generator' ) ] );
 	}
 

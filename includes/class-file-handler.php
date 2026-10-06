@@ -231,34 +231,58 @@ class GFFPDF_File_Handler {
 		}
 
 		global $wpdb;
-		$table  = $wpdb->prefix . 'gffpdf_entries';
-		$cutoff = gmdate( 'Y-m-d H:i:s', time() - ( $days * DAY_IN_SECONDS ) );
+		$table = $wpdb->prefix . 'gffpdf_entries';
+
+		// IMPORTANT: generated_at is written with current_time( 'mysql' ), i.e.
+		// in the SITE's timezone, not UTC. The cutoff must be built in the same
+		// timezone (wp_date() uses the site timezone). The old gmdate() cutoff
+		// was off by the site's UTC offset, so on a site ahead of UTC every PDF
+		// looked "newer" than it was and deletion slipped by that many hours
+		// (or a whole extra cron cycle).
+		$cutoff_ts = time() - ( $days * DAY_IN_SECONDS );
+		$cutoff    = wp_date( 'Y-m-d H:i:s', $cutoff_ts );
 
 		// The "pdf_path != ''" check skips rows already processed by a
-		// previous run, so this doesn't keep rescanning the same old rows
-		// forever once their file has been removed.
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Batch maintenance query, not user-facing.
+		// previous run. LIMIT keeps a single run bounded on very large sites;
+		// the next hourly run continues where this one stopped.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Batch maintenance query; table name is built from $wpdb->prefix.
 		$old_rows = $wpdb->get_results( $wpdb->prepare(
 			"SELECT id, pdf_path FROM %i WHERE generated_at < %s AND pdf_path != ''",
 			$table,
 			$cutoff
 		) );
 
-		if ( empty( $old_rows ) ) {
-			return;
+		$deleted = 0;
+		if ( ! empty( $old_rows ) ) {
+			foreach ( $old_rows as $row ) {
+				if ( ! empty( $row->pdf_path ) && GFFPDF_Security::is_safe_path( $row->pdf_path ) && file_exists( $row->pdf_path ) ) {
+					wp_delete_file( $row->pdf_path );
+				}
+				// Clear the path rather than deleting the row: keeps the entry's
+				// "PDF generated on <date>" history intact and lets the existing
+				// "File missing" UI + Regenerate button do their job.
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+				$wpdb->update( $table, [ 'pdf_path' => '' ], [ 'id' => $row->id ], [ '%s' ], [ '%d' ] );
+				$deleted++;
+			}
 		}
 
-		$deleted = 0;
-		foreach ( $old_rows as $row ) {
-			if ( ! empty( $row->pdf_path ) && GFFPDF_Security::is_safe_path( $row->pdf_path ) && file_exists( $row->pdf_path ) ) {
-				wp_delete_file( $row->pdf_path );
+		// Second pass: orphaned files. Any *.pdf in generated/ that has no DB
+		// row (row deleted, collision-renamed copy, failed DB insert, files
+		// copied in manually …) is invisible to the query above and would stay
+		// on the server forever. Sweep by file modification time instead.
+		$orphans = glob( GFFPDF_UPLOAD_DIR . self::GENERATED_DIR . '*.pdf' );
+		if ( $orphans ) {
+			foreach ( $orphans as $file ) {
+				if ( is_file( $file ) && filemtime( $file ) < $cutoff_ts && GFFPDF_Security::is_safe_path( $file ) ) {
+					wp_delete_file( $file );
+					$deleted++;
+				}
 			}
-			// Clear the path rather than deleting the row: keeps the entry's
-			// "PDF generated on <date>" history intact and lets the existing
-			// "File missing" UI + Regenerate button do their job.
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-			$wpdb->update( $table, [ 'pdf_path' => '' ], [ 'id' => $row->id ], [ '%s' ], [ '%d' ] );
-			$deleted++;
+		}
+
+		if ( ! $deleted ) {
+			return;
 		}
 
 		GFFPDF_Logger::info( 'Scheduled cleanup removed old generated PDF files', [

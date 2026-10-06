@@ -41,8 +41,14 @@ class GFFPDF_Loader{
         // is configured, prunes old generated PDFs so storage doesn't grow
         // unbounded on high-volume sites.
         add_action( 'gffpdf_daily_cleanup', [ 'GFFPDF_File_Handler', 'run_scheduled_cleanup' ] );
+        // Runs HOURLY (hook name kept for backwards compatibility). A once-a-day
+        // run meant "1 day" retention could keep a PDF for up to ~2 days.
+        // Sites that were already scheduled as 'daily' are migrated here.
+        if ( wp_next_scheduled( 'gffpdf_daily_cleanup' ) && 'hourly' !== wp_get_schedule( 'gffpdf_daily_cleanup' ) ) {
+            wp_clear_scheduled_hook( 'gffpdf_daily_cleanup' );
+        }
         if ( ! wp_next_scheduled( 'gffpdf_daily_cleanup' ) ) {
-            wp_schedule_event( time(), 'daily', 'gffpdf_daily_cleanup' );
+            wp_schedule_event( time() + 60, 'hourly', 'gffpdf_daily_cleanup' );
         }
     }
 }
