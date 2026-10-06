@@ -88,7 +88,7 @@ class GFFPDF_Template_Handler {
 				"UPDATE {$wpdb->prefix}gffpdf_feeds SET template_path = '', is_active = 0 WHERE template_path = %s",
 				$path
 			) );
-			GFFPDF_Logger::info( 'Template deleted', [ 'path' => $path ] );
+			GFFPDF_Logger::info( __('Template deleted', 'gf-fillable-pdf-generator'), [ 'path' => $path ] );
 		}
 
 		return $deleted;

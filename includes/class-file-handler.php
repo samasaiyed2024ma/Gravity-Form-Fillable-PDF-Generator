@@ -46,7 +46,7 @@ class GFFPDF_File_Handler {
 			return new WP_Error( 'upload_failed', esc_html__( 'Failed to move uploaded file.', 'gf-fillable-pdf-generator' ) );
 		}
 
-		GFFPDF_Logger::info( 'Template uploaded', [ 'path' => $dest_path ] );
+		GFFPDF_Logger::info( __('Template uploaded', 'gf-fillable-pdf-generator'), [ 'path' => $dest_path ] );
 		return $dest_path;
 	}
 
@@ -103,7 +103,7 @@ class GFFPDF_File_Handler {
 			return new WP_Error( 'save_failed', esc_html__( 'Failed to save generated PDF.', 'gf-fillable-pdf-generator' ) );
 		}
 
-		GFFPDF_Logger::info( 'Generated PDF saved', [ 'path' => $path ] );
+		GFFPDF_Logger::info( __('Generated PDF saved', 'gf-fillable-pdf-generator'), [ 'path' => $path ] );
 		return $path;
 	}
 
@@ -285,7 +285,7 @@ class GFFPDF_File_Handler {
 			return;
 		}
 
-		GFFPDF_Logger::info( 'Scheduled cleanup removed old generated PDF files', [
+		GFFPDF_Logger::info( __('Scheduled cleanup removed old generated PDF files', 'gf-fillable-pdf-generator'), [
 			'count'          => $deleted,
 			'retention_days' => $days,
 		] );

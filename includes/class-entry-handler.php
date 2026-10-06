@@ -81,7 +81,7 @@ class GFFPDF_Entry_Handler {
 			$result = $this->process_feed( $feed, $entry, $form );
 			// WP_Error results are already logged inside process_feed; nothing else needed here.
 			if ( is_wp_error( $result ) && $result->get_error_code() !== 'conditional_logic' ) {
-				GFFPDF_Logger::error( 'Submission PDF failed', [
+				GFFPDF_Logger::error( __('Submission PDF failed', 'gf-fillable-pdf-generator'), [
 					'feed_id'  => $feed->id,
 					'entry_id' => $entry['id'],
 					'reason'   => $result->get_error_message(),
@@ -109,11 +109,12 @@ class GFFPDF_Entry_Handler {
 			// as a transient attachment copy (already sent, if configured, via
 			// maybe_attach_pdf_to_notification()) and is not kept or recorded.
 			return new WP_Error( 'save_disabled',
-				sprintf( 'Feed "%s": PDF saving is disabled in global settings.', $feed->feed_name )
+				/* translators: %s: Feed name */
+				sprintf( __('Feed "%s": PDF saving is disabled in global settings.', 'gf-fillable-pdf-generator'), $feed->feed_name )
 			);
 		}
 
-		GFFPDF_Logger::info( 'PDF generated', [
+		GFFPDF_Logger::info( __('PDF generated', 'gf-fillable-pdf-generator'), [
 			'entry_id' => $entry['id'],
 			'feed_id'  => $feed_id,
 			'path'     => $result['path'],
@@ -161,7 +162,7 @@ class GFFPDF_Entry_Handler {
 		// was edited so that it no longer matches.
 		$settings = json_decode( $feed->settings, true ) ?? [];
 		if ( ! $this->passes_conditional_logic( $settings, $entry, $form ) ) {
-			GFFPDF_Logger::info( 'Feed skipped: conditional logic', [ 'feed_id' => $feed_id, 'entry_id' => $entry_id ] );
+			GFFPDF_Logger::info( __('Feed skipped: conditional logic', 'gf-fillable-pdf-generator'), [ 'feed_id' => $feed_id, 'entry_id' => $entry_id ] );
 			return array_merge( $empty_result, [ 'error' => new WP_Error( 'conditional_logic',
 				// translators: %s: The name of the feed config.
 				sprintf( __( 'Feed "%s": skipped — conditional logic rules not met for this entry.', 'gf-fillable-pdf-generator' ), $feed->feed_name )
@@ -192,7 +193,7 @@ class GFFPDF_Entry_Handler {
 
 		// --- Template check ---
 		if ( empty( $template_path ) || ! file_exists( $template_path ) ) {
-			GFFPDF_Logger::error( 'Template file missing', [ 'feed_id' => $feed_id, 'path' => $template_path ] );
+			GFFPDF_Logger::error( __('Template file missing', 'gf-fillable-pdf-generator'), [ 'feed_id' => $feed_id, 'path' => $template_path ] );
 			return array_merge( $empty_result, [ 'error' => new WP_Error( 'template_missing',
 				// translators: %s: The name of the feed config.
 				sprintf( __( 'Feed "%s": PDF template file is missing or has not been uploaded.', 'gf-fillable-pdf-generator' ), $feed->feed_name )
@@ -205,7 +206,7 @@ class GFFPDF_Entry_Handler {
 		} );
 
 		if ( empty( $active_mappings ) ) {
-			GFFPDF_Logger::warn( 'No field mappings configured', [ 'feed_id' => $feed_id ] );
+			GFFPDF_Logger::warn( __('No field mappings configured', 'gf-fillable-pdf-generator'), [ 'feed_id' => $feed_id ] );
 			return array_merge( $empty_result, [ 'error' => new WP_Error( 'no_mappings',
 				// translators: %s: The name of the feed config.
 				sprintf( __( 'Feed "%s": no field mappings configured — please map at least one PDF field to a form field.', 'gf-fillable-pdf-generator' ), $feed->feed_name )
@@ -231,14 +232,14 @@ class GFFPDF_Entry_Handler {
 		$pdf_bytes = $generator->generate( $template_path, $field_values, $settings );
 
 		if ( is_wp_error( $pdf_bytes ) ) {
-			GFFPDF_Logger::error( 'PDF generation failed', [
+			GFFPDF_Logger::error( __('PDF generation failed', 'gf-fillable-pdf-generator'), [
 				'feed_id'  => $feed_id,
 				'entry_id' => $entry['id'],
 				'error'    => $pdf_bytes->get_error_message(),
 			] );
 			return array_merge( $empty_result, [ 'error' => new WP_Error(
 				$pdf_bytes->get_error_code(),
-				sprintf( 'Feed "%s": %s', $feed->feed_name, $pdf_bytes->get_error_message() )
+				sprintf( __('Feed "%s": %s', 'gf-fillable-pdf-generator'), $feed->feed_name, $pdf_bytes->get_error_message() )
 			) ] );
 		}
 
@@ -261,10 +262,10 @@ class GFFPDF_Entry_Handler {
 
 		$path = GFFPDF_File_Handler::save_generated( $pdf_bytes, $filename );
 		if ( is_wp_error( $path ) ) {
-			GFFPDF_Logger::error( 'PDF save failed', [ 'feed_id' => $feed_id, 'entry' => $entry['id'] ] );
+			GFFPDF_Logger::error( __('PDF save failed', 'gf-fillable-pdf-generator'), [ 'feed_id' => $feed_id, 'entry' => $entry['id'] ] );
 			return array_merge( $empty_result, [ 'error' => new WP_Error(
 				$path->get_error_code(),
-				sprintf( 'Feed "%s": %s', $feed->feed_name, $path->get_error_message() )
+				sprintf( __('Feed "%s": %s', 'gf-fillable-pdf-generator'), $feed->feed_name, $path->get_error_message() )
 			) ] );
 		}
 
@@ -580,7 +581,7 @@ class GFFPDF_Entry_Handler {
 			}
 
 			if ( ! $wants_this_notification ) {
-				GFFPDF_Logger::info( 'Notification attach skipped: not selected for this feed', [
+				GFFPDF_Logger::info( __('Notification attach skipped: not selected for this feed', 'gf-fillable-pdf-generator'), [
 					'feed_id'         => $feed->id,
 					'entry_id'        => $entry['id'],
 					'notification_id' => $notification_id,
@@ -591,7 +592,7 @@ class GFFPDF_Entry_Handler {
 
 			$result = $this->resolve_pdf( $feed, $entry, $form );
 			if ( is_wp_error( $result['error'] ?? null ) || empty( $result['path'] ) ) {
-				GFFPDF_Logger::warn( 'Notification attach skipped: PDF unavailable', [
+				GFFPDF_Logger::warn( __('Notification attach skipped: PDF unavailable', 'gf-fillable-pdf-generator'), [
 					'feed_id'         => $feed->id,
 					'entry_id'        => $entry['id'],
 					'notification_id' => $notification_id,
@@ -605,7 +606,7 @@ class GFFPDF_Entry_Handler {
 			}
 			$notification['attachments'][] = $result['path'];
 
-			GFFPDF_Logger::info( 'PDF attached to notification', [
+			GFFPDF_Logger::info( __('PDF attached to notification', 'gf-fillable-pdf-generator'), [
 				'feed_id'         => $feed->id,
 				'entry_id'        => $entry['id'],
 				'notification_id' => $notification_id,

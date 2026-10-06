@@ -74,7 +74,7 @@ class GFFPDF_Pdf_Document {
 
 	public function __construct( string $data ) {
 		if ( strpos( substr( $data, 0, 2048 ), '%PDF-' ) === false ) {
-			throw new RuntimeException( 'Not a PDF file.' );
+			throw new RuntimeException( __('Not a PDF file.', 'gf-fillable-pdf-generator') );
 		}
 		$this->s   = $data;
 		$this->len = strlen( $data );
@@ -82,11 +82,11 @@ class GFFPDF_Pdf_Document {
 		try {
 			$this->load_xref();
 			if ( ! $this->trailer instanceof GFFPDF_Pdf_Dict || ! $this->trailer->get( 'Root' ) instanceof GFFPDF_Pdf_Ref ) {
-				throw new RuntimeException( 'Trailer has no Root.' );
+				throw new RuntimeException( __('Trailer has no Root.', 'gf-fillable-pdf-generator') );
 			}
 			// Sanity check that the catalog is actually reachable.
 			if ( ! $this->catalog() ) {
-				throw new RuntimeException( 'Catalog unreadable.' );
+				throw new RuntimeException( __('Catalog unreadable.', 'gf-fillable-pdf-generator') );
 			}
 		} catch ( \Throwable $e ) {
 			$this->rebuild_xref();
@@ -106,7 +106,7 @@ class GFFPDF_Pdf_Document {
 		$tail = substr( $this->s, -2048 );
 		$pos  = strrpos( $tail, 'startxref' );
 		if ( $pos === false || ! preg_match( '/startxref\s+(\d+)/', $tail, $m, 0, $pos ) ) {
-			throw new RuntimeException( 'startxref not found.' );
+			throw new RuntimeException( __('startxref not found.', 'gf-fillable-pdf-generator') );
 		}
 		$this->startxref = (int) $m[1];
 
@@ -121,7 +121,7 @@ class GFFPDF_Pdf_Document {
 			}
 			$seen[ $off ] = true;
 			if ( $off < 0 || $off >= $this->len ) {
-				if ( $first ) throw new RuntimeException( 'Bad startxref.' );
+				if ( $first ) throw new RuntimeException( __('Bad startxref.', 'gf-fillable-pdf-generator') );
 				continue;
 			}
 
@@ -162,14 +162,14 @@ class GFFPDF_Pdf_Document {
 					break;
 				}
 				if ( ! preg_match( '/\G(\d+)[ \t\r\n]+(\d+)[ \t\r\n]*/', $this->s, $m, 0, $this->p ) ) {
-					throw new RuntimeException( 'Bad xref subsection.' );
+					throw new RuntimeException( __('Bad xref subsection.', 'gf-fillable-pdf-generator') );
 				}
 				$this->p += strlen( $m[0] );
 				$start = (int) $m[1];
 				$count = (int) $m[2];
 				for ( $i = 0; $i < $count; $i++ ) {
 					if ( ! preg_match( '/\G\s*(\d{1,10})\s+(\d{1,5})\s+([nf])/', $this->s, $e, 0, $this->p ) ) {
-						throw new RuntimeException( 'Bad xref entry.' );
+						throw new RuntimeException( __('Bad xref entry.', 'gf-fillable-pdf-generator') );
 					}
 					$this->p += strlen( $e[0] );
 					// Common producer bug: subsection says "1 N" but first entry is the free head.
@@ -184,7 +184,7 @@ class GFFPDF_Pdf_Document {
 			}
 			$tr = $this->parse_value();
 			if ( ! $tr instanceof GFFPDF_Pdf_Dict ) {
-				throw new RuntimeException( 'Bad trailer.' );
+				throw new RuntimeException( __('Bad trailer.', 'gf-fillable-pdf-generator') );
 			}
 			return $tr;
 		}
@@ -194,12 +194,12 @@ class GFFPDF_Pdf_Document {
 		$obj = $this->parse_indirect_at( $off );
 		$st  = $obj[2];
 		if ( ! $st instanceof GFFPDF_Pdf_Stream ) {
-			throw new RuntimeException( 'Expected xref stream.' );
+			throw new RuntimeException( __('Expected xref stream.', 'gf-fillable-pdf-generator') );
 		}
 		$d    = $st->dict;
 		$data = $this->decode_stream( $st );
 		$w    = $this->arr_ints( $d->get( 'W' ) );
-		if ( count( $w ) < 3 ) throw new RuntimeException( 'Bad xref /W.' );
+		if ( count( $w ) < 3 ) throw new RuntimeException( __('Bad xref /W.', 'gf-fillable-pdf-generator') );
 		$size  = (int) $d->get( 'Size' );
 		$index = $this->arr_ints( $d->get( 'Index' ) );
 		if ( ! $index ) $index = [ 0, $size ];
@@ -303,7 +303,7 @@ class GFFPDF_Pdf_Document {
 		}
 		if ( ! $trailer->get( 'Root' ) instanceof GFFPDF_Pdf_Ref ) {
 			if ( ! $catalog_ref ) {
-				throw new RuntimeException( 'Could not locate the PDF catalog; the file appears to be damaged.' );
+				throw new RuntimeException( __('Could not locate the PDF catalog; the file appears to be damaged.', 'gf-fillable-pdf-generator') );
 			}
 			$trailer->set( 'Root', $catalog_ref );
 		}
@@ -351,7 +351,7 @@ class GFFPDF_Pdf_Document {
 		}
 		$enc = $this->dict( $raw );
 		if ( ! $enc ) {
-			throw new RuntimeException( 'This PDF is encrypted and its encryption settings could not be read.' );
+			throw new RuntimeException( __('This PDF is encrypted and its encryption settings could not be read.', 'gf-fillable-pdf-generator') );
 		}
 		$id  = $this->resolve( $this->trailer->get( 'ID' ) );
 		$id0 = '';
@@ -535,7 +535,7 @@ class GFFPDF_Pdf_Document {
 				}
 				if ( $data === null ) {
 					$end = strpos( $this->s, 'endstream', $start );
-					if ( $end === false ) throw new RuntimeException( 'Unterminated stream.' );
+					if ( $end === false ) throw new RuntimeException( __('Unterminated stream.', 'gf-fillable-pdf-generator') );
 					$data = substr( $this->s, $start, $end - $start );
 					$data = preg_replace( '/(\r\n|\n|\r)$/', '', $data );
 				}
@@ -578,7 +578,7 @@ class GFFPDF_Pdf_Document {
 	private function parse_value() {
 		$this->skip_ws();
 		if ( $this->p >= $this->len ) {
-			throw new RuntimeException( 'Unexpected end of data.' );
+			throw new RuntimeException( __('Unexpected end of data.', 'gf-fillable-pdf-generator') );
 		}
 		$c = $this->s[ $this->p ];
 
@@ -602,7 +602,7 @@ class GFFPDF_Pdf_Document {
 				$d = new GFFPDF_Pdf_Dict();
 				while ( true ) {
 					$this->skip_ws();
-					if ( $this->p >= $this->len ) throw new RuntimeException( 'Unterminated dictionary.' );
+					if ( $this->p >= $this->len ) throw new RuntimeException( __('Unterminated dictionary.', 'gf-fillable-pdf-generator') );
 					if ( substr( $this->s, $this->p, 2 ) === '>>' ) { $this->p += 2; break; }
 					$k = $this->parse_value();
 					if ( ! $k instanceof GFFPDF_Pdf_Name ) {
@@ -615,7 +615,7 @@ class GFFPDF_Pdf_Document {
 				return $d;
 			}
 			$end = strpos( $this->s, '>', $this->p );
-			if ( $end === false ) throw new RuntimeException( 'Unterminated hex string.' );
+			if ( $end === false ) throw new RuntimeException( __('Unterminated hex string.', 'gf-fillable-pdf-generator') );
 			$hex = preg_replace( '/[^0-9A-Fa-f]/', '', substr( $this->s, $this->p + 1, $end - $this->p - 1 ) );
 			if ( strlen( $hex ) % 2 ) $hex .= '0';
 			$this->p = $end + 1;
@@ -627,7 +627,7 @@ class GFFPDF_Pdf_Document {
 			$a = new GFFPDF_Pdf_Arr();
 			while ( true ) {
 				$this->skip_ws();
-				if ( $this->p >= $this->len ) throw new RuntimeException( 'Unterminated array.' );
+				if ( $this->p >= $this->len ) throw new RuntimeException( __('Unterminated array.', 'gf-fillable-pdf-generator') );
 				if ( $this->s[ $this->p ] === ']' ) { $this->p++; break; }
 				$a->a[] = $this->parse_value();
 			}
@@ -727,7 +727,7 @@ class GFFPDF_Pdf_Document {
 				$out = @gzuncompress( $data );
 				if ( $out === false ) $out = @gzinflate( substr( $data, 2 ) );
 				if ( $out === false ) $out = @zlib_decode( $data );
-				if ( $out === false ) throw new RuntimeException( 'Could not inflate stream.' );
+				if ( $out === false ) throw new RuntimeException( __('Could not inflate stream.', 'gf-fillable-pdf-generator') );
 				$data = $out;
 				$pd   = $pl[ $i ] ?? null;
 				if ( $pd ) {
@@ -840,7 +840,7 @@ class GFFPDF_Pdf_Document {
 			}
 			return $o . '>>';
 		}
-		throw new RuntimeException( 'Cannot serialize value.' );
+		throw new RuntimeException( __('Cannot serialize value.', 'gf-fillable-pdf-generator') );
 	}
 
 	/** Produce the original file with all changes appended (original bytes untouched). */

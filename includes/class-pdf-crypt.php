@@ -39,7 +39,13 @@ class GFFPDF_Pdf_Crypt {
 	public function __construct( GFFPDF_Pdf_Document $doc, GFFPDF_Pdf_Dict $enc, string $id0 ) {
 		$filter = $doc->name( $enc->get( 'Filter' ) );
 		if ( $filter !== '' && $filter !== 'Standard' ) {
-			throw new RuntimeException( 'This PDF uses an unsupported encryption handler (' . esc_html($filter) . '), so its form fields cannot be filled.' );
+			throw new RuntimeException( 
+				sprintf(
+					/* translators: %s: Encryption handler filter name (e.g., Standard, Adobe.PubSec) */
+					__( 'This PDF uses an unsupported encryption handler (%s), so its form fields cannot be filled.', 'gf-fillable-pdf-generator' ),
+					$filter
+				)
+			);
 		}
 
 		$this->v = (int) $doc->num( $enc->get( 'V' ), 0 );
@@ -103,7 +109,7 @@ class GFFPDF_Pdf_Crypt {
 			$ok = hash_equals( substr( $u, 0, 16 ), $x );
 		}
 		if ( ! $ok ) {
-			throw new RuntimeException( 'This PDF needs a password to open, so its form fields cannot be filled. Please upload a copy without a password.' );
+			throw new RuntimeException( __( 'This PDF needs a password to open, so its form fields cannot be filled. Please upload a copy without a password.', 'gf-fillable-pdf-generator') );
 		}
 	}
 
@@ -178,19 +184,19 @@ class GFFPDF_Pdf_Crypt {
 	private function open_r56( GFFPDF_Pdf_Document $doc, GFFPDF_Pdf_Dict $enc, string $u ): string {
 		$ue = $this->str( $doc, $enc->get( 'UE' ) );
 		if ( strlen( $u ) < 48 || strlen( $ue ) < 32 ) {
-			throw new RuntimeException( 'This PDF uses an encryption layout that could not be read, so its form fields cannot be filled.' );
+			throw new RuntimeException( __('This PDF uses an encryption layout that could not be read, so its form fields cannot be filled.', 'gf-fillable-pdf-generator') );
 		}
 		$vsalt = substr( $u, 32, 8 );
 		$ksalt = substr( $u, 40, 8 );
 		$pw    = '';
 
 		if ( ! hash_equals( substr( $u, 0, 32 ), $this->hash_r56( $pw, $vsalt, '' ) ) ) {
-			throw new RuntimeException( 'This PDF needs a password to open, so its form fields cannot be filled. Please upload a copy without a password.' );
+			throw new RuntimeException( __('This PDF needs a password to open, so its form fields cannot be filled. Please upload a copy without a password.', 'gf-fillable-pdf-generator') );
 		}
 		$ik = $this->hash_r56( $pw, $ksalt, '' );
 		$fk = openssl_decrypt( substr( $ue, 0, 32 ), 'aes-256-cbc', $ik, OPENSSL_RAW_DATA | OPENSSL_ZERO_PADDING, str_repeat( "\0", 16 ) );
 		if ( $fk === false || strlen( $fk ) !== 32 ) {
-			throw new RuntimeException( 'Could not derive the encryption key for this PDF.' );
+			throw new RuntimeException( __('Could not derive the encryption key for this PDF.', 'gf-fillable-pdf-generator') );
 		}
 		return $fk;
 	}

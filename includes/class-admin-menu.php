@@ -405,7 +405,7 @@ class GFFPDF_Admin_Menu {
 
 	public function ajax_deactivate_cleanup():void{
 		if(!check_ajax_referer('gffpdf_deactivate_cleanup', 'nonce', false) || ! GFFPDF_Security::current_user_can()){
-			wp_send_json_error(['message' => 'Permission denied.'], 403);
+			wp_send_json_error(['message' => __('Permission denied.', 'gf-fillable-pdf-generator')], 403);
 		}
 
 		// Delegate all cleanup to the deactivator class

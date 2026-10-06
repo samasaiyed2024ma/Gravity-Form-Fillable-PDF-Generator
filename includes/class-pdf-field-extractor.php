@@ -115,7 +115,7 @@ class GFFPDF_PDF_Field_Extractor {
 			if ( stripos( $e->getMessage(), 'password' ) !== false || stripos( $e->getMessage(), 'encrypt' ) !== false ) {
 				throw $e; // can't be filled at all — tell the admin instead of guessing
 			}
-			GFFPDF_Logger::warn( 'Built-in field parser failed, falling back', [ 'error' => $e->getMessage() ] );
+			GFFPDF_Logger::warn( __('Built-in field parser failed, falling back', 'gf-fillable-pdf-generator'), [ 'error' => $e->getMessage() ] );
 		}
 
 		if ( ! class_exists( '\Smalot\PdfParser\Parser' ) ) {
@@ -209,7 +209,7 @@ class GFFPDF_PDF_Field_Extractor {
 			return $fields;
 
 		} catch ( \Exception $e ) {
-			GFFPDF_Logger::warn( 'smalot parse failed, falling back to regex', [ 'error' => $e->getMessage() ] );
+			GFFPDF_Logger::warn( __('smalot parse failed, falling back to regex', 'gf-fillable-pdf-generator'), [ 'error' => $e->getMessage() ] );
 			return $this->parse_fields_via_regex( $pdf_path );
 		}
 	}

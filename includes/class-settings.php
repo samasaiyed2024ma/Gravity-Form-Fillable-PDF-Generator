@@ -79,7 +79,7 @@ class GFFPDF_Settings {
 		$clean    = GFFPDF_Security::sanitize_settings( array_merge( $existing, $raw ) );
 		update_option( 'gffpdf_settings', $clean );
 
-		GFFPDF_Logger::info( 'Global settings saved' );
+		GFFPDF_Logger::info( __('Global settings saved', 'gf-fillable-pdf-generator') );
 
 		// Apply a retention period straight away instead of waiting for the
 		// next cron tick (WP-Cron only fires when the site gets a visit).
@@ -87,7 +87,7 @@ class GFFPDF_Settings {
 			try {
 				GFFPDF_File_Handler::run_scheduled_cleanup();
 			} catch ( \Throwable $e ) {
-				GFFPDF_Logger::error( 'Cleanup after settings save failed', [ 'error' => $e->getMessage() ] );
+				GFFPDF_Logger::error( __('Cleanup after settings save failed', 'gf-fillable-pdf-generator'), [ 'error' => $e->getMessage() ] );
 			}
 		}
 		wp_send_json_success( [ 'message' => __( 'Settings saved.', 'gf-fillable-pdf-generator' ) ] );

@@ -101,7 +101,7 @@ class GFFPDF_REST_API {
 	public function get_feed( WP_REST_Request $request ): WP_REST_Response {
 		$feed = GFFPDF_Feed_Settings::get_feed( absint( $request['id'] ) );
 		if ( ! $feed ) {
-			return new WP_REST_Response( [ 'message' => 'Feed not found' ], 404 );
+			return new WP_REST_Response( [ 'message' => __('Feed not found', 'gf-fillable-pdf-generator') ], 404 );
 		}
 		$feed->settings = json_decode( $feed->settings, true );
 		$feed->mappings = json_decode( $feed->mappings, true );
@@ -141,7 +141,7 @@ class GFFPDF_REST_API {
 	public function upload_template( WP_REST_Request $request ): WP_REST_Response {
 		$files = $request->get_file_params();
 		if ( empty( $files['pdf_file'] ) ) {
-			return new WP_REST_Response( [ 'message' => 'No file provided' ], 400 );
+			return new WP_REST_Response( [ 'message' => __('No file provided', 'gf-fillable-pdf-generator') ], 400 );
 		}
 		$handler = new GFFPDF_Template_Handler();
 		$result  = $handler->handle_upload( $files['pdf_file'] );
@@ -159,7 +159,7 @@ class GFFPDF_REST_API {
 		$feed_id = absint( $request->get_param( 'feed_id' ) );
 		$feed    = GFFPDF_Feed_Settings::get_feed( $feed_id );
 		if ( ! $feed ) {
-			return new WP_REST_Response( [ 'message' => 'Feed not found' ], 404 );
+			return new WP_REST_Response( [ 'message' => __('Feed not found', 'gf-fillable-pdf-generator') ], 404 );
 		}
 		return new WP_REST_Response( json_decode( $feed->mappings, true ), 200 );
 	}
@@ -169,7 +169,7 @@ class GFFPDF_REST_API {
 		$feed_id = absint( $data['feed_id'] ?? 0 );
 		$feed    = GFFPDF_Feed_Settings::get_feed( $feed_id );
 		if ( ! $feed ) {
-			return new WP_REST_Response( [ 'message' => 'Feed not found' ], 404 );
+			return new WP_REST_Response( [ 'message' => __('Feed not found', 'gf-fillable-pdf-generator') ], 404 );
 		}
 
 		$clean    = GFFPDF_Security::sanitize_mappings( $data['mappings'] ?? [] );

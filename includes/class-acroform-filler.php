@@ -145,14 +145,27 @@ class GFFPDF_AcroForm_Filler {
 			$this->cur_alias = $this->aliases[ $name ] ?? null;
 			$targets = $by_fqn[ $name ] ?? ( $by_partial[ $name ] ?? [] );
 			if ( ! $targets ) {
-				$this->note( "No PDF field named '$name' in the template." );
+				$this->note( 
+					sprintf(
+						/* translators: %s: Field name */
+						__( "No PDF field named '%s' in the template.", 'gf-fillable-pdf-generator' ),
+						$name
+					) 
+				);
 				continue;
 			}
 			foreach ( $targets as $idx ) {
 				try {
 					if ( $this->fill_field( $this->fields[ $idx ], $value ) ) $filled++;
 				} catch ( \Throwable $e ) {
-					$this->note( "Field '$name' could not be filled: " . $e->getMessage() );
+					$this->note( 
+						sprintf(
+							/* translators: 1: Field name, 2: Error message */
+							__( "Field '%1\$s' could not be filled: %2\$s", 'gf-fillable-pdf-generator' ),
+							$name,
+							$e->getMessage()
+						)
+					);
 					$this->need_appearances = true;
 				}
 			}
@@ -174,7 +187,7 @@ class GFFPDF_AcroForm_Filler {
 	private function load( string $bytes ): void {
 		$this->doc = new GFFPDF_Pdf_Document( $bytes );
 		$cat = $this->doc->catalog();
-		if ( ! $cat ) throw new RuntimeException( 'PDF catalog not found.' );
+		if ( ! $cat ) throw new RuntimeException( __('PDF catalog not found.', 'gf-fillable-pdf-generator') );
 
 		$raw = $cat->get( 'AcroForm' );
 		$this->acro_num = $raw instanceof GFFPDF_Pdf_Ref ? $raw->num : null;
@@ -209,11 +222,11 @@ class GFFPDF_AcroForm_Filler {
 		}
 		if ( ! $roots ) {
 			if ( $this->has_xfa( $acro ) ) {
-				throw new GFFPDF_XFA_Only_Exception( 'This PDF is an XFA-only form (no AcroForm fields).' );
+				throw new GFFPDF_XFA_Only_Exception( __('This PDF is an XFA-only form (no AcroForm fields).', 'gf-fillable-pdf-generator') );
 			}
 			throw new RuntimeException( $raw === null
-				? 'This PDF has no fillable form fields — it is not a fillable form.'
-				: 'The PDF form contains no fields.' );
+				? __('This PDF has no fillable form fields — it is not a fillable form.', 'gf-fillable-pdf-generator')
+				: __('The PDF form contains no fields.', 'gf-fillable-pdf-generator') );
 		}
 		$this->field_roots = $roots;
 
@@ -222,7 +235,7 @@ class GFFPDF_AcroForm_Filler {
 			$this->walk_field( $ref, [], '', 0, $seen );
 		}
 		if ( ! $this->fields ) {
-			throw new RuntimeException( 'No fillable AcroForm fields found in this PDF.' );
+			throw new RuntimeException( __('No fillable AcroForm fields found in this PDF.', 'gf-fillable-pdf-generator') );
 		}
 	}
 
@@ -539,9 +552,9 @@ class GFFPDF_AcroForm_Filler {
 		$b    = strtolower( preg_replace( '/^[A-Z]{6}\+/', '', $base ) );
 		$bold = (bool) preg_match( '/bold|black|heavy|demi/', $b );
 		$ital = (bool) preg_match( '/italic|oblique/', $b );
-		if ( strpos( $b, 'courier' ) !== false )                                                              $fam = 'courier';
+		if ( strpos( $b, 'courier' ) !== false ) $fam = 'courier';
 		elseif ( preg_match( '/times|georgia|garamond|palatino|serif/', $b ) && strpos( $b, 'sans' ) === false ) $fam = 'times';
-		else                                                                                                  $fam = 'helvetica';
+		else $fam = 'helvetica';
 		return $fam . ( $bold ? 'b' : '' ) . ( $ital ? 'i' : '' );
 	}
 
@@ -807,7 +820,15 @@ class GFFPDF_AcroForm_Filler {
 		if ( $on === null && $radio && $count > 1 && isset( $alias['index'], $alias['count'] )
 			&& (int) $alias['count'] === $count && $alias['index'] >= 0 && $alias['index'] < $count ) {
 			$on = (int) $alias['index'];
-			$this->note( "Radio '{$f['fqn']}': no option name matched '$v'; used option position " . ( $on + 1 ) . ' instead.' );
+			$this->note( 
+				sprintf(
+					/* translators: 1: Radio field fully qualified name, 2: Value supplied, 3: Option position index */
+					__( "Radio '%1\$s': no option name matched '%2\$s'; used option position %3\$d instead.", 'gf-fillable-pdf-generator' ),
+					$f['fqn'],
+					$v,
+					$on + 1
+				)
+			);
 		}
 
 		if ( $on === null ) {
@@ -892,7 +913,13 @@ class GFFPDF_AcroForm_Filler {
 		}
 		$img = $this->image_cache[ $key ];
 		if ( ! $img ) {
-			$this->note( "Image for field '{$f['fqn']}' could not be read." );
+			$this->note( 
+				sprintf(
+					/* translators: %s: Field fully qualified name */
+					__( "Image for field '%s' could not be read.", 'gf-fillable-pdf-generator' ),
+					$f['fqn']
+				)
+			);
 			return false;
 		}
 
@@ -953,7 +980,7 @@ class GFFPDF_AcroForm_Filler {
 			$dec = $this->decode_png( $raw );
 		}
 		if ( ! $dec ) {
-			$this->note( 'This image format could not be decoded (use PNG or JPEG, or enable the PHP GD extension).' );
+			$this->note( __('This image format could not be decoded (use PNG or JPEG, or enable the PHP GD extension).', 'gf-fillable-pdf-generator') );
 			return null;
 		}
 		$w = $dec['w']; $h = $dec['h'];
@@ -1388,7 +1415,7 @@ class GFFPDF_AcroForm_Filler {
 			if ( $n > $best_n ) { $best_n = $n; $best = $k; }
 		}
 		if ( $best !== null && count( $need ) > 0 && $best_n < count( $need ) ) {
-			$this->note( 'Some characters have no glyph in any available font; upload a font that supports this script in Fonts settings.' );
+			$this->note( __('Some characters have no glyph in any available font; upload a font that supports this script in Fonts settings.', 'gf-fillable-pdf-generator') );
 		}
 		return $best;
 	}
