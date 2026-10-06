@@ -48,10 +48,22 @@ class GFFPDF_Feed_Settings {
 		$menu_items[] = [
 			'name'  => 'gffpdf',
 			'label' => __( 'Fillable PDF', 'gf-fillable-pdf-generator' ),
+			'icon'  => self::menu_icon(),
 		];
 		return $menu_items;
 	}
 
+	/**
+	 * Inline SVG for the Gravity Forms settings menus. Gravity Forms 2.5+ draws a
+	 * menu item's 'icon' next to its label; an inline SVG needs no icon font or
+	 * image URL, and fill="currentColor" makes it match the other menu icons.
+	 */
+	public static function menu_icon(): string {
+		return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true" focusable="false">'
+			. '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>'
+			. '</svg>';
+	}
+	
 	public function render_form_settings_page(): void {
 		if ( ! GFFPDF_Security::current_user_can() ) {
 			wp_die( esc_html__( 'Permission denied.', 'gf-fillable-pdf-generator' ) );
@@ -61,7 +73,7 @@ class GFFPDF_Feed_Settings {
 		$form    = GFAPI::get_form( $form_id );
 		$feeds   = self::get_feeds_by_form( $form_id );
 		$fields  = $this->get_gf_fields( $form );
-		$notifications = ! empty( $form['notifications'] ) ? array_map( function( $id, $n ){
+		$gffpdf_notifications = ! empty( $form['notifications'] ) ? array_map( function( $id, $n ){
 			return [ 
 				'id' => $id,  
 				'name' => $n['name'] ?? $id,
@@ -117,6 +129,7 @@ class GFFPDF_Feed_Settings {
 				'uploading'         => __( 'Uploading PDF...', 'gf-fillable-pdf-generator' ),
 				'upload_success'    => __( 'PDF uploaded successfully.', 'gf-fillable-pdf-generator' ),
 				'no_fields'         => __( 'No fillable fields found in this PDF.', 'gf-fillable-pdf-generator' ),
+				'template_missing'  => __( 'The PDF template file for this feed is missing. Upload the PDF again to re-map its fields; your saved mappings are shown below.', 'gf-fillable-pdf-generator' ),
 				'uploading_font'    => __( 'Uploading font...',  'gf-fillable-pdf-generator'),
 				'font_uploaded'     => __( 'Font uploaded.', 'gf-fillable-pdf-generator' ),
 				'confirm_del_font'  => __( 'Delete this font', 'gf-fillable-pdf-generator' ),
@@ -131,58 +144,56 @@ class GFFPDF_Feed_Settings {
 	 * -------------------------------------------------------------------- */
 
 	public function ajax_save_feed(): void {
+		// Verifies the nonce created in enqueue_feed_assets() AND the user's capability.
 		GFFPDF_Security::check_ajax();
 
-		// Mappings are posted as a JSON string to avoid PHP's dot-to-underscore
-		// mangling of POST keys (e.g. field id "1.3" becomes "1_3" in $_POST).
-		// phpcs:disable WordPress.Security.NonceVerification.Recommended, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Nonce verified via GFFPDF_Security::check_ajax(), input sanitized manually or via JSON decode.
-		$raw_mappings = $_POST['mappings_json'] ?? '';
+		// 1. Mappings JSON
+		$raw_mappings = isset( $_POST['mappings_json'] ) ? wp_unslash( $_POST['mappings_json'] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
 		$mappings     = [];
-		if ( is_string( $raw_mappings ) && $raw_mappings !== '' ) {
-			$decoded = json_decode( wp_unslash( $raw_mappings ), true );
+		if ( is_string( $raw_mappings ) && '' !== $raw_mappings ) {
+			$decoded = json_decode( $raw_mappings, true );
 			if ( is_array( $decoded ) ) {
 				$mappings = $decoded;
 			}
 		}
 
-		// Conditional logic posted as JSON
-		$raw_cl = $_POST['conditional_logic_json'] ?? '';
+		// 2. Conditional logic JSON
+		$raw_cl           = isset( $_POST['conditional_logic_json'] ) ? wp_unslash( $_POST['conditional_logic_json'] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
 		$conditional_logic = [];
-		if( is_string( $raw_cl ) && $raw_cl !== '' ){
-			$decode_cl = json_decode( wp_unslash( $raw_cl ), true );
-			if( is_array( $decode_cl ) ){
+		if ( is_string( $raw_cl ) && '' !== $raw_cl ) {
+			$decode_cl = json_decode( $raw_cl, true );
+			if ( is_array( $decode_cl ) ) {
 				$conditional_logic = $decode_cl;
 			}
 		}
 
-		// Notification IDs posted as JSON
-		$raw_notifications = $_POST['notification_ids_json'] ?? '';
-		$notification_ids = [];
-		if( is_string( $raw_notifications ) && $raw_notifications !== '' ){
-			$decoded_n = json_decode( wp_unslash( $raw_notifications ), true );
-			if( is_array( $decoded_n ) ){
+		// 3. Notification IDs JSON
+		$raw_notifications = isset( $_POST['notification_ids_json'] ) ? wp_unslash( $_POST['notification_ids_json'] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+		$notification_ids  = [];
+		if ( is_string( $raw_notifications ) && '' !== $raw_notifications ) {
+			$decoded_n = json_decode( $raw_notifications, true );
+			if ( is_array( $decoded_n ) ) {
 				$notification_ids = $decoded_n;
 			}
 		}
 
 		// Build feed_settings array, ensuring save_pdfs defaults to true
-		$raw_settings              = isset( $_POST['feed_settings'] ) ? wp_unslash( (array) $_POST['feed_settings'] ) : [];
-		$raw_settings['save_pdfs'] = $raw_settings['save_pdfs'] ?? 1;
+		$raw_settings                      = isset( $_POST['feed_settings'] ) ? (array) wp_unslash( $_POST['feed_settings'] ) : []; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+		$raw_settings['save_pdfs']         = $raw_settings['save_pdfs'] ?? 1;
 		$raw_settings['attach_to_email']   = ! empty( $raw_settings['attach_to_email'] ) ? 1 : 0;
-		$raw_settings['conditional_logic'] = $conditional_logic;
-		$raw_settings['notification_ids'] = $notification_ids;
+		$raw_settings['conditional_logic']  = $conditional_logic;
+		$raw_settings['notification_ids']   = $notification_ids;
 
 		$data = [
-			'form_id'       => absint( $_POST['form_id'] ?? 0 ),
-			'feed_name'     => sanitize_text_field( wp_unslash( $_POST['feed_name'] ?? '' ) ),
-			'template_path' => sanitize_text_field( wp_unslash( $_POST['template_path'] ?? '' ) ),
+			'form_id'       => isset( $_POST['form_id'] ) ? absint( $_POST['form_id'] ) : 0,
+			'feed_name'     => isset( $_POST['feed_name'] ) ? sanitize_text_field( wp_unslash( $_POST['feed_name'] ) ) : '',
+			'template_path' => isset( $_POST['template_path'] ) ? sanitize_text_field( wp_unslash( $_POST['template_path'] ) ) : '',
 			'mappings'      => $mappings,
-			'is_active'     => absint( $_POST['is_active'] ?? 0 ),
+			'is_active'     => isset( $_POST['is_active'] ) ? absint( $_POST['is_active'] ) : 0,
 			'settings'      => $raw_settings,
 		];
 
-		$feed_id = absint( $_POST['feed_id'] ?? 0 );
-		// phpcs:enable
+		$feed_id = isset( $_POST['feed_id'] ) ? absint( $_POST['feed_id'] ) : 0;
 
 		if ( $feed_id ) {
 			$result = self::update_feed( $feed_id, $data );
@@ -199,7 +210,9 @@ class GFFPDF_Feed_Settings {
 	}
 
 	public function ajax_delete_feed(): void {
+		// Verifies the nonce created in enqueue_feed_assets() AND the user's capability.
 		GFFPDF_Security::check_ajax();
+
 		$feed_id = absint( $_POST['feed_id'] ?? 0 );
 
 		if ( ! $feed_id ) {
@@ -211,7 +224,9 @@ class GFFPDF_Feed_Settings {
 	}
 
 	public function ajax_toggle_feed(): void {
+		// Verifies the nonce created in enqueue_feed_assets() AND the user's capability.
 		GFFPDF_Security::check_ajax();
+
 		$feed_id   = absint( $_POST['feed_id'] ?? 0 );
 		$is_active = absint( $_POST['is_active'] ?? 0 );
 
@@ -224,7 +239,9 @@ class GFFPDF_Feed_Settings {
 	}
 
 	public function ajax_duplicate_feed(): void {
+		// Verifies the nonce created in enqueue_feed_assets() AND the user's capability.
 		GFFPDF_Security::check_ajax();
+
 		$feed_id = absint( $_POST['feed_id'] ?? 0 );
 		$feed    = self::get_feed( $feed_id );
 
@@ -249,6 +266,7 @@ class GFFPDF_Feed_Settings {
 	}
 
 	public function ajax_upload_pdf(): void {
+		// Verifies the nonce created in enqueue_feed_assets() AND the user's capability.
 		GFFPDF_Security::check_ajax();
 
 		if ( empty( $_FILES['pdf_file'] ) ) {
@@ -256,7 +274,8 @@ class GFFPDF_Feed_Settings {
 		}
 
 		$handler = new GFFPDF_Template_Handler();
-		$result  = $handler->handle_upload( $_FILES['pdf_file'] );
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- File array input sanitized and validated inside handle_upload().
+		$result  = $handler->handle_upload( $_FILES['pdf_file'] ?? [] );
 
 		if ( is_wp_error( $result ) ) {
 			wp_send_json_error( [ 'message' => $result->get_error_message() ] );
@@ -274,7 +293,9 @@ class GFFPDF_Feed_Settings {
 	}
 
 	public function ajax_get_feed(): void {
+		// Verifies the nonce created in enqueue_feed_assets() AND the user's capability.
 		GFFPDF_Security::check_ajax();
+
 		$feed_id = absint( $_POST['feed_id'] ?? 0 );
 		$feed    = self::get_feed( $feed_id );
 
@@ -286,22 +307,35 @@ class GFFPDF_Feed_Settings {
 		// receives null and crashes on property access.
 		$feed->settings   = json_decode( $feed->settings,  false ) ?: new stdClass();
 		$feed->mappings   = json_decode( $feed->mappings,   true  ) ?: [];
-		$feed->pdf_fields = [];
+		$feed->pdf_fields       = [];
+		$feed->template_missing = false;
+		$feed->fields_error     = '';
 
-		// Load stored PDF fields (with coordinates) for the mapping UI.
-		if ( ! empty( $feed->template_path ) && file_exists( $feed->template_path ) ) {
-			$extractor        = new GFFPDF_PDF_Field_Extractor();
-			$feed->pdf_fields = $extractor->get_simple_fields_for_ui( $feed->template_path );
+		// Load stored PDF fields for the mapping UI. A problem reading the
+		// template must never stop the feed from opening for editing.
+		if ( ! empty( $feed->template_path ) ) {
+			if ( file_exists( $feed->template_path ) ) {
+				try {
+					$extractor        = new GFFPDF_PDF_Field_Extractor();
+					$feed->pdf_fields = $extractor->get_simple_fields_for_ui( $feed->template_path );
+				} catch ( \Throwable $e ) {
+					$feed->fields_error = $e->getMessage();
+					GFFPDF_Logger::warn( 'Could not read template fields while editing feed', [ 'feed_id' => $feed_id, 'error' => $e->getMessage() ] );
+				}
+			} else {
+				$feed->template_missing = true;
+			}
 		}
 
 		wp_send_json_success( $feed );
 	}
 
 	public function ajax_auto_map(): void {
+		// Verifies the nonce created in enqueue_feed_assets() AND the user's capability.
 		GFFPDF_Security::check_ajax();
 
-		$form_id    = absint( $_POST['form_id'] ?? 0 );
-		$pdf_fields = $_POST['pdf_fields'] ?? [];
+		$form_id    = isset( $_POST['form_id'] ) ? absint( wp_unslash( $_POST['form_id'] ) ) : 0;
+		$pdf_fields = isset( $_POST['pdf_fields'] ) ? (array) wp_unslash( $_POST['pdf_fields'] ) : []; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
 
 		$form      = GFAPI::get_form( $form_id );
 		$gf_fields = $this->get_gf_fields( $form );
@@ -319,6 +353,7 @@ class GFFPDF_Feed_Settings {
 	 * Font management AJAX
 	 * -------------------------------------------------------------------- */
 	public function ajax_upload_font(): void{
+		// Verifies the nonce created in enqueue_feed_assets() AND the user's capability.
 		GFFPDF_Security::check_ajax();
 
 		if( empty( $_FILES['font_file'] ) ){
@@ -326,6 +361,7 @@ class GFFPDF_Feed_Settings {
 		}
 
 		$label = sanitize_text_field( wp_unslash( $_POST['font_label'] ?? '' ) );
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- File array elements are validated inside GFFPDF_Font_Manager::upload_font().
 		$result = GFFPDF_Font_Manager::upload_font( $_FILES['font_file'], $label );
 
 		if( is_wp_error($result) ){
@@ -340,6 +376,7 @@ class GFFPDF_Feed_Settings {
 	}
 
 	public function ajax_delete_font(): void{
+		// Verifies the nonce created in enqueue_feed_assets() AND the user's capability.
 		GFFPDF_Security::check_ajax();
 
 		$family = sanitize_key( wp_unslash( $_POST['family'] ?? '' ) );
@@ -358,22 +395,23 @@ class GFFPDF_Feed_Settings {
 	 * Notification list AJAX
 	 * -------------------------------------------------------------------- */
 	public function ajax_get_notifications(): void{
+		// Verifies the nonce created in enqueue_feed_assets() AND the user's capability.
 		GFFPDF_Security::check_ajax();
 
 		$form_id = absint( $_POST['form_id'] ?? 0 );
 		$form = GFAPI::get_form( $form_id );
 
-		$notifications = [];
+		$gffpdf_notifications = [];
 		if( !empty($form['notifications']) && is_array( $form['notifications'] ) ){
 			foreach( $form['notifications'] as $id => $n ){
-				$notifications[] = [
+				$gffpdf_notifications[] = [
 					'id' => $id,
 					'name' => $n['name'] ?? $id,
 				];
 			}
 		}
 
-		wp_send_json_success( $notifications );
+		wp_send_json_success( $gffpdf_notifications );
 	}
 
 	/* -----------------------------------------------------------------------
@@ -395,6 +433,9 @@ class GFFPDF_Feed_Settings {
 	}
 
 	public function ajax_public_download(): void {
+		// Authenticated by the signed per-PDF token below — NOT by a nonce or a
+		// login: the person opening this link from an email is a visitor.
+
 		$pdf_id = absint( $_GET['pdf_id'] ?? 0 );
 		$token  = sanitize_text_field( wp_unslash( $_GET['token'] ?? '' ) );
 
@@ -480,6 +521,7 @@ class GFFPDF_Feed_Settings {
 		}
 
 		global $wpdb;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		return $wpdb->get_row(
 			$wpdb->prepare(
 				"SELECT * FROM {$wpdb->prefix}gffpdf_entries WHERE entry_id = %d AND feed_id = %d ORDER BY generated_at DESC LIMIT 1",
@@ -606,6 +648,7 @@ class GFFPDF_Feed_Settings {
 
 		$clean = GFFPDF_Security::sanitize_feed( $data );
 
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		$inserted = $wpdb->insert(
 			$wpdb->prefix . 'gffpdf_feeds',
 			[
@@ -634,6 +677,7 @@ class GFFPDF_Feed_Settings {
 
 		$clean = GFFPDF_Security::sanitize_feed( $data );
 
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		$updated = $wpdb->update(
 			$wpdb->prefix . 'gffpdf_feeds',
 			[
@@ -655,6 +699,8 @@ class GFFPDF_Feed_Settings {
 
 	public static function delete_feed( int $feed_id ): bool {
 		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		$deleted = $wpdb->delete(
 			$wpdb->prefix . 'gffpdf_feeds',
 			[ 'id' => $feed_id ],
@@ -666,6 +712,8 @@ class GFFPDF_Feed_Settings {
 
 	public static function toggle_feed( int $feed_id, int $is_active ): bool {
 		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		return $wpdb->update(
 			$wpdb->prefix . 'gffpdf_feeds',
 			[ 'is_active' => $is_active, 'updated_at' => current_time( 'mysql' ) ],
@@ -677,6 +725,8 @@ class GFFPDF_Feed_Settings {
 
 	public static function get_feed( int $feed_id ): ?object {
 		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		return $wpdb->get_row( $wpdb->prepare(
 			"SELECT * FROM {$wpdb->prefix}gffpdf_feeds WHERE id = %d",
 			$feed_id
@@ -685,6 +735,8 @@ class GFFPDF_Feed_Settings {
 
 	public static function get_feeds_by_form( int $form_id ): array {
 		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		return $wpdb->get_results( $wpdb->prepare(
 			"SELECT * FROM {$wpdb->prefix}gffpdf_feeds WHERE form_id = %d ORDER BY created_at DESC",
 			$form_id
@@ -693,6 +745,8 @@ class GFFPDF_Feed_Settings {
 
 	public static function get_active_feeds_by_form( int $form_id ): array {
 		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		return $wpdb->get_results( $wpdb->prepare(
 			"SELECT * FROM {$wpdb->prefix}gffpdf_feeds WHERE form_id = %d AND is_active = 1 ORDER BY id ASC",
 			$form_id

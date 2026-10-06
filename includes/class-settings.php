@@ -15,6 +15,7 @@ class GFFPDF_Settings {
 		$menu[] = [
 			'name'  => 'gffpdf',
 			'label' => __( 'Fillable PDF Generator', 'gf-fillable-pdf-generator' ),
+			'icon'  => GFFPDF_Feed_Settings::menu_icon(),
 		];
 		return $menu;
 	}
@@ -52,9 +53,9 @@ class GFFPDF_Settings {
 	}
 
 	public function ajax_save_settings(): void {
-		GFFPDF_Security::check_ajax();
+		check_ajax_referer( 'gffpdf_nonce', 'nonce' );
 		
-		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Nonce is verified inside GFFPDF_Security::check_ajax()
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Verified by GFFPDF_Security::check_ajax(); settings sanitized downstream.		$raw = isset( $_POST['settings'] ) ? wp_unslash( $_POST['settings'] ) : [];
 		$raw = isset( $_POST['settings'] ) ? wp_unslash( $_POST['settings'] ) : [];
 		if ( ! is_array( $raw ) ) {
 			wp_send_json_error( [ 'message' => __( 'Invalid data.', 'gf-fillable-pdf-generator' ) ] );

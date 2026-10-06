@@ -382,11 +382,13 @@ class GFFPDF_Admin_Menu {
 	}
 
 	private function serve_pdf( string $mode ): void {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Nonce is verified via custom helper GFFPDF_Security::verify_nonce().
 		$nonce  = sanitize_text_field( wp_unslash( $_GET['nonce'] ?? '' ) );
 		if ( ! GFFPDF_Security::verify_nonce( $nonce ) || ! GFFPDF_Security::current_user_can() ) {
 			wp_die( esc_html__( 'Permission denied.', 'gf-fillable-pdf-generator' ), 403 );
 		}
 
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Nonce verified above.
 		$pdf_id = absint( $_GET['pdf_id'] ?? 0 );
 		$record = GFFPDF_Entry_Handler::get_pdf_record( $pdf_id );
 

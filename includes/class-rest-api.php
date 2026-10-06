@@ -91,6 +91,8 @@ class GFFPDF_REST_API {
 			$feeds = GFFPDF_Feed_Settings::get_feeds_by_form( absint( $form_id ) );
 		} else {
 			global $wpdb;
+
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 			$feeds = $wpdb->get_results( "SELECT * FROM {$wpdb->prefix}gffpdf_feeds ORDER BY created_at DESC" );
 		}
 		return new WP_REST_Response( $feeds, 200 );

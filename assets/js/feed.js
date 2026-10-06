@@ -22,6 +22,23 @@
 		},
 
 		/* ----------------------------------------------------------------
+		 * Turn any failed AJAX response into a readable message.
+		 * (A bad nonce / permission problem used to fail silently, which is
+		 * what made "Edit" appear to do nothing.)
+		 * ------------------------------------------------------------- */
+		errorText: function (xhr) {
+			try {
+				const j = xhr && xhr.responseJSON;
+				if (j && j.data && j.data.message) return j.data.message;
+			} catch (e) {}
+			if (xhr && xhr.status === 403 || (xhr && xhr.responseText === '-1')) {
+				return 'Security check failed. Please reload the page and try again.';
+			}
+			if (xhr && xhr.status === 0) return 'Network error. Please check your connection and try again.';
+			return GFFPDF.strings.error;
+		},
+
+		/* ----------------------------------------------------------------
 		 * Notice
 		 * ------------------------------------------------------------- */
 		showNotice: function (message, type) {
@@ -175,14 +192,14 @@
 				})
 				.done(function (res) {
 					/** If the server returns a failure status, it fires an error notification and halts further execution. */
-					if (!res.success) {
-						Feed.showNotice(res.data.message || GFFPDF.strings.error, 'error');
+					if (!res || !res.success) {
+						Feed.showNotice((res && res.data && res.data.message) || GFFPDF.strings.error, 'error');
 						return;
 					}
 
 					/** If successful, saves the payload of server configurations into temporary variables. */
 					const feed     = res.data;
-					const settings = feed.settings || {};
+					const settings = (feed.settings && !Array.isArray(feed.settings)) ? feed.settings : {};
 
 					/** Fills out the layout input boxes using data fetched from the database. */
 					$('#gffpdf-editor-title').text('Edit Feed');
@@ -243,11 +260,35 @@
 					}
 
 					// ── Mappings ──────────────────────────────────────────
-					if (feed.pdf_fields && feed.pdf_fields.length) {
-						window.GFFPDF_Mappings.render(feed.pdf_fields, feed.mappings || {});
+					const savedMappings = feed.mappings || {};
+					let pdfFields = feed.pdf_fields || [];
+
+					// If the template can't be read right now (file missing, or
+					// unreadable), still list the saved mapping rows so the feed
+					// stays fully editable instead of showing an empty section.
+					if (!pdfFields.length) {
+						const keys = Object.keys(savedMappings);
+						if (keys.length) {
+							pdfFields = keys.map(function (k) { return { name: k, type: 'text' }; });
+						}
+					}
+					if (pdfFields.length) {
+						window.GFFPDF_Mappings.render(pdfFields, savedMappings);
+					} else {
+						$('#gffpdf-mappings-section').hide();
 					}
 
 					Feed.openEditor();
+
+					if (feed.template_missing) {
+						Feed.showNotice(GFFPDF.strings.template_missing, 'error');
+					} else if (feed.fields_error) {
+						Feed.showNotice(feed.fields_error, 'error');
+					}
+				})
+				.fail(function (xhr) {
+					Feed.currentFeedId = null;
+					Feed.showNotice(Feed.errorText(xhr), 'error');
 				});
 			});
 		},
@@ -352,8 +393,8 @@
 						Feed.showNotice(res.data.message || GFFPDF.strings.error, 'error');
 					}
 				})
-				.fail(function () {
-					Feed.showNotice(GFFPDF.strings.error, 'error');
+				.fail(function (xhr) {
+					Feed.showNotice(Feed.errorText(xhr), 'error');
 				})
 				.always(function () {
 					$btn.prop('disabled', false).html(
@@ -386,6 +427,9 @@
 					} else {
 						Feed.showNotice(res.data.message || GFFPDF.strings.error, 'error');
 					}
+				})
+				.fail(function (xhr) {
+					Feed.showNotice(Feed.errorText(xhr), 'error');
 				});
 			});
 		},
@@ -411,6 +455,9 @@
 					} else {
 						Feed.showNotice(res.data.message || GFFPDF.strings.error, 'error');
 					}
+				})
+				.fail(function (xhr) {
+					Feed.showNotice(Feed.errorText(xhr), 'error');
 				});
 			});
 		},
@@ -428,6 +475,10 @@
 					nonce:     GFFPDF.nonce,
 					feed_id:   feedId,
 					is_active: $cb.is(':checked') ? 1 : 0,
+				})
+				.fail(function (xhr) {
+					$cb.prop('checked', !$cb.is(':checked')); // revert the switch
+					Feed.showNotice(Feed.errorText(xhr), 'error');
 				});
 			});
 		},
@@ -468,7 +519,8 @@
 
 						const fields = res.data.fields;
 						if (fields && fields.length) {
-							window.GFFPDF_Mappings.render(fields, {});
+							// Keep any mapping whose PDF field name still exists in the new template.
+							window.GFFPDF_Mappings.render(fields, window.GFFPDF_Mappings.collect());
 						} else {
 							$('#gffpdf-mappings-section').hide();
 							alert(GFFPDF.strings.no_fields);
@@ -477,8 +529,8 @@
 						$status.text(res.data.message || 'Upload failed.').addClass('error');
 					}
 				})
-				.fail(function () {
-					$status.text(GFFPDF.strings.error).addClass('error');
+				.fail(function (xhr) {
+					$status.text(Feed.errorText(xhr)).addClass('error');
 				});
 			});
 		},

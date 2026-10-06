@@ -585,6 +585,7 @@ class GFFPDF_Entry_Handler {
 		$table = $wpdb->prefix . 'gffpdf_entries';
 
 		// Delete existing record for this entry and feed to prevent duplicates
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		$wpdb->delete(
 			$table,
 			[
@@ -595,6 +596,7 @@ class GFFPDF_Entry_Handler {
 		);
 
 		// Insert fresh record
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		$wpdb->insert(
 			$table,
 			[
@@ -615,22 +617,27 @@ class GFFPDF_Entry_Handler {
 		$table = $wpdb->prefix . 'gffpdf_entries';
 
 		// Group by feed_id to return only 1 file per feed
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		return $wpdb->get_results( $wpdb->prepare(
 			"SELECT e1.* 
-			FROM {$table} e1
+			FROM %i e1
 			INNER JOIN (
 				SELECT MAX(id) as max_id 
-				FROM {$table} 
+				FROM %i 
 				WHERE entry_id = %d 
 				GROUP BY feed_id
 			) e2 ON e1.id = e2.max_id
 			ORDER BY e1.generated_at DESC",
+			$table,
+			$table,
 			$entry_id
 		) );
 	}
 
 	public static function get_pdf_record( int $id ): ?object {
 		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		return $wpdb->get_row( $wpdb->prepare(
 			"SELECT * FROM {$wpdb->prefix}gffpdf_entries WHERE id = %d",
 			$id
@@ -648,6 +655,8 @@ class GFFPDF_Entry_Handler {
 		}
 
 		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		$row = $wpdb->get_row( $wpdb->prepare(
 			"SELECT * FROM {$wpdb->prefix}gffpdf_entries WHERE entry_id = %d AND feed_id = %d AND pdf_path != '' ORDER BY generated_at DESC LIMIT 1",
 			$entry_id,
@@ -671,8 +680,11 @@ class GFFPDF_Entry_Handler {
 		// which manifests as "HTTP 200: Request failed" in the browser.
 		ob_start();
 
-		$entry_id = absint( $_REQUEST['entry_id'] ?? 0 );
-		$nonce    = sanitize_text_field( wp_unslash( $_REQUEST['nonce'] ?? '' ) );
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Nonce verified via GFFPDF_Security::verify_nonce() on line 683.
+		$entry_id = isset( $_REQUEST['entry_id'] ) ? absint( wp_unslash( $_REQUEST['entry_id'] ) ) : 0;
+
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Nonce input extracted here for custom check.
+		$nonce = isset( $_REQUEST['nonce'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['nonce'] ) ) : '';
 
 		if ( ! $entry_id ) {
 			ob_end_clean();

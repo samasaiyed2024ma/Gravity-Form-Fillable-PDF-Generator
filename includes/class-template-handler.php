@@ -83,6 +83,7 @@ class GFFPDF_Template_Handler {
 
 		if ( $deleted ) {
 			// Nullify feeds referencing this template
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 			$wpdb->query( $wpdb->prepare(
 				"UPDATE {$wpdb->prefix}gffpdf_feeds SET template_path = '', is_active = 0 WHERE template_path = %s",
 				$path

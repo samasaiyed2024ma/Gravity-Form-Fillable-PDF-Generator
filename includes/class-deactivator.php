@@ -19,7 +19,9 @@ class GFFPDF_Deactivator {
         }
 
 		// Drop tables
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange -- Cleanup routine upon plugin uninstallation/cleanup.
 		$wpdb->query("DROP TABLE IF EXISTS {$wpdb->prefix}gffpdf_feeds");
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange -- Cleanup routine upon plugin uninstallation/cleanup.
 		$wpdb->query("DROP TABLE IF EXISTS {$wpdb->prefix}gffpdf_entries");
 
 		// Remove options

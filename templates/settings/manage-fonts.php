@@ -2,8 +2,8 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-$_custom_fonts  = GFFPDF_Font_Manager::get_custom_fonts();
-$_builtin_fonts = GFFPDF_Font_Manager::get_builtin_fonts();
+$gffpdf_custom_fonts  = GFFPDF_Font_Manager::get_custom_fonts();
+$gffpdf_builtin_fonts = GFFPDF_Font_Manager::get_builtin_fonts();
 ?>
 <div class="gffpdf-fonts-partial" style="padding:20px;">
 
@@ -29,12 +29,12 @@ $_builtin_fonts = GFFPDF_Font_Manager::get_builtin_fonts();
 	<!-- Custom fonts list -->
 	<div class="uploaded-custom-fonts-container" style="margin-top:24px;padding-bottom:20px;border-bottom:1px solid #e5e7eb;">
 		<h3 style="margin-top:0;"><?php esc_html_e( 'Uploaded Custom Fonts', 'gf-fillable-pdf-generator' ); ?></h3>
-		<?php if ( empty( $_custom_fonts ) ) : ?>
+		<?php if ( empty( $gffpdf_custom_fonts ) ) : ?>
 			<p class="description" id="gffpdf-no-custom-fonts"><?php esc_html_e( 'No custom fonts uploaded yet.', 'gf-fillable-pdf-generator' ); ?></p>
 		<?php else : ?>
 			<p class="description" id="gffpdf-no-custom-fonts" style="display:none;"><?php esc_html_e( 'No custom fonts uploaded yet.', 'gf-fillable-pdf-generator' ); ?></p>
 		<?php endif; ?>
-		<table class="widefat" id="gffpdf-inline-custom-fonts-table" <?php echo empty($_custom_fonts) ? 'style="display:none;"' : ''; ?>>
+		<table class="widefat" id="gffpdf-inline-custom-fonts-table" <?php echo empty($gffpdf_custom_fonts) ? 'style="display:none;"' : ''; ?>>
 			<thead>
 				<tr>
 					<th><?php esc_html_e( 'Family Key', 'gf-fillable-pdf-generator' ); ?></th>
@@ -43,12 +43,12 @@ $_builtin_fonts = GFFPDF_Font_Manager::get_builtin_fonts();
 				</tr>
 			</thead>
 			<tbody id="gffpdf-inline-custom-fonts-list" style="background:#f0f0f0cf">
-				<?php foreach ( $_custom_fonts as $family => $label ) : ?>
-					<tr id="gffpdf-inline-font-row-<?php echo esc_attr( $family ); ?>">
-						<td><code><?php echo esc_html( $family ); ?></code></td>
-						<td><?php echo esc_html( $label ); ?></td>
+				<?php foreach ( $gffpdf_custom_fonts as $gffpdf_font_family => $gffpdf_font_label ) : ?>
+					<tr id="gffpdf-inline-font-row-<?php echo esc_attr( $gffpdf_font_family ); ?>">
+						<td><code><?php echo esc_html( $gffpdf_font_family ); ?></code></td>
+						<td><?php echo esc_html( $gffpdf_font_label ); ?></td>
 						<td>
-							<button type="button" class="button button-small gffpdf-delete-font-inline" data-family="<?php echo esc_attr( $family ); ?>">
+							<button type="button" class="button button-small gffpdf-delete-font-inline" data-family="<?php echo esc_attr( $gffpdf_font_family ); ?>">
 								<?php esc_html_e( 'Delete', 'gf-fillable-pdf-generator' ); ?>
 							</button>
 						</td>
@@ -70,10 +70,10 @@ $_builtin_fonts = GFFPDF_Font_Manager::get_builtin_fonts();
 					</tr>
 				</thead>
 				<tbody style="background:#f0f0f0cf">
-					<?php foreach ( $_builtin_fonts as $fam => $lbl ) : ?>
+					<?php foreach ( $gffpdf_builtin_fonts as $gffpdf_fam => $gffpdf_lbl ) : ?>
 						<tr>
-							<td><code><?php echo esc_html( $fam ); ?></code></td>
-							<td><?php echo esc_html( $lbl ); ?></td>
+							<td><code><?php echo esc_html( $gffpdf_fam ); ?></code></td>
+							<td><?php echo esc_html( $gffpdf_lbl ); ?></td>
 						</tr>
 					<?php endforeach; ?>
 				</tbody>

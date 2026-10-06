@@ -186,7 +186,7 @@ class GFFPDF_Font_Manager {
 	 * @return bool  True when the font is a variable font, false otherwise.
 	 */
 	private static function is_variable_font( string $path ): bool {
-        // phpcs:disable WordPress.WP.AlternativeFunctions.file_system_read_fopen, WordPress.WP.AlternativeFunctions.file_system_read_fread, WordPress.WP.AlternativeFunctions.file_system_read_fclose -- Custom binary parsing requires byte-level pointer streaming rather than loading the whole file into memory.
+		// phpcs:disable WordPress.WP.AlternativeFunctions.file_system_operations_fopen, WordPress.WP.AlternativeFunctions.file_system_operations_fread, WordPress.WP.AlternativeFunctions.file_system_operations_fclose, WordPress.WP.AlternativeFunctions.file_system_read_fopen, WordPress.WP.AlternativeFunctions.file_system_read_fread, WordPress.WP.AlternativeFunctions.file_system_read_fclose -- Binary parsing requires byte-level pointer streaming rather than loading entire files into memory.
         $fp = @fopen( $path, 'rb' );
         if ( ! $fp ) {
             return false;

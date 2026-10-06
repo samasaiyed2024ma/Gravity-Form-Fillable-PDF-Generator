@@ -25,13 +25,13 @@
 							<td>
 								<select id="gffpdf-font-family" name="default_font_family">
 									<?php
-									$families = GFFPDF_Font_Manager::get_all_fonts();
-									foreach ( $families as $val => $label ) {
+									$gffpdf_font_families = GFFPDF_Font_Manager::get_all_fonts();
+									foreach ( $gffpdf_font_families as $gffpdf_font_val => $gffpdf_font_label ) {
 										printf(
 											'<option value="%s"%s>%s</option>',
-											esc_attr( $val ),
-											selected( $settings['default_font_family'], $val, false ),
-											esc_html( $label )
+											esc_attr( $gffpdf_font_val ),
+											selected( $settings['default_font_family'], $gffpdf_font_val, false ),
+											esc_html( $gffpdf_font_label )
 										);
 									}
 									?>
@@ -99,16 +99,16 @@
 						</tr>
 
 						<!-- Flatten PDF -->
-						<!-- <tr>
+						<tr>
 							<th scope="row"><?php esc_html_e( 'Flatten PDFs', 'gf-fillable-pdf-generator' ); ?></th>
 							<td>
 								<label>
 									<input type="checkbox" id="gffpdf-flatten" name="flatten_pdf" value="1"
-										<?php //checked( $settings['flatten_pdf'] ); ?>>
-									<?php// esc_html_e( 'Flatten after filling (prevents editing)', 'gf-fillable-pdf-generator' ); ?>
+										<?php checked( $settings['flatten_pdf'] ); ?>>
+									<?php esc_html_e( 'Flatten after filling (prevents editing)', 'gf-fillable-pdf-generator' ); ?>
 								</label>
 							</td>
-						</tr> -->
+						</tr>
 
 						<!-- RTL Support -->
 						<tr>

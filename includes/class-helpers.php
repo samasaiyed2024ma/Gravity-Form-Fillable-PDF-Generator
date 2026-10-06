@@ -208,6 +208,10 @@ $filename = preg_replace_callback( '/\{field:([\d.]+)\}/', function( $m ) use ( 
 	 * Returns the best-matching GF field ID or 0.
 	 */
 	public static function auto_map( string $pdf_field_name, array $gf_fields ): int {
+		// XFA / hierarchical names ("form1.address.city"): match on the last part.
+		if ( strpos( $pdf_field_name, '.' ) !== false ) {
+			$pdf_field_name = substr( $pdf_field_name, strrpos( $pdf_field_name, '.' ) + 1 );
+		}
 		$normalised_pdf = self::normalise_field_name( $pdf_field_name );
 
 		$common_map = [

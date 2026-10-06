@@ -2,9 +2,11 @@
 /**
  * GFFPDF_Mappings
  *
- * Handles rendering the PDF-field → GF-field mapping rows inside the
- * feed modal, auto-mapping, and collecting the final mapping object
- * for submission.
+ * Renders the PDF-field → Gravity-Forms-field mapping rows inside the feed
+ * editor, runs auto-mapping, and collects the mapping object for saving.
+ *
+ * Works for every kind of fillable PDF: field names come from the server
+ * (AcroForm names, or dotted XFA paths such as "form1.address.city").
  *
  * Depends on:  jQuery, GFFPDF (localised by class-feed-settings.php)
  * Loaded after: gffpdf-feed (feed.js)
@@ -20,21 +22,14 @@
 		/**
 		 * render( pdfFields, savedMappings )
 		 *
-		 * Accepts pdfFields as either:
-		 *   - string[]                 e.g. ['first_name', 'email']
-		 *   - {name: string, type: string}[]  (shape returned by PHP extractor)
-		 *
-		 * savedMappings is { pdfFieldName: gfFieldId } — values may be
-		 * integers (from PHP absint) or strings; both are handled.
-		 *
-		 * @param {Array}  pdfFields
-		 * @param {Object} savedMappings
+		 * @param {Array}  pdfFields     string[] or {name, type}[]
+		 * @param {Object} savedMappings { pdfFieldName: gfFieldId }
 		 */
 		render: function (pdfFields, savedMappings) {
 			savedMappings = savedMappings || {};
 
 			const $section = $('#gffpdf-mappings-section');
-			const $tbody = $('#gffpdf-mapping-rows');
+			const $tbody   = $('#gffpdf-mapping-rows');
 
 			$tbody.empty();
 
@@ -43,21 +38,20 @@
 				return;
 			}
 
-			// Normalise: accept {name, type} objects or plain strings
-			const names = pdfFields.map(function (f) {
-				return (typeof f === 'object' && f !== null) ? f.name : String(f);
+			const items = pdfFields.map(function (f) {
+				return (typeof f === 'object' && f !== null)
+					? { name: String(f.name), type: f.type || 'text' }
+					: { name: String(f), type: 'text' };
 			});
 
-			// Load GF fields from the JSON island printed by the PHP template
 			this.gfFields = this._loadGFFields();
 
 			const self = this;
-			$.each(names, function (i, name) {
-				const savedValue = savedMappings.hasOwnProperty(name)
-					? String(savedMappings[name])
+			$.each(items, function (i, item) {
+				const saved = Object.prototype.hasOwnProperty.call(savedMappings, item.name)
+					? String(savedMappings[item.name])
 					: '';
-				const $row = self._buildRow(name, savedValue);
-				$tbody.append($row);
+				$tbody.append(self._buildRow(i, item, saved));
 			});
 
 			$section.show();
@@ -65,26 +59,18 @@
 		},
 
 		/**
-		 * collect()
-		 *
-		 * Reads every mapping <select> and returns { pdfFieldName: gfFieldId }.
-		 * Called by feed.js before posting to gffpdf_save_feed.
-		 *
-		 * @returns {Object}
+		 * collect() → { pdfFieldName: gfFieldId }
+		 * Reads every mapping <select>. Returns {} when no rows are rendered.
 		 */
 		collect: function () {
 			const mappings = {};
-
 			$('#gffpdf-mapping-rows tr').each(function () {
-				const $row = $(this);
-				const pdfField = $row.data('pdf-field');
-				const gfFieldId = $row.find('.gffpdf-gf-field-select').val();
-
+				// .attr(), not .data(): jQuery would turn a name like "123" into a number.
+				const pdfField = $(this).attr('data-pdf-field');
 				if (pdfField !== undefined && pdfField !== '') {
-					mappings[pdfField] = gfFieldId || '';
+					mappings[pdfField] = $(this).find('.gffpdf-gf-field-select').val() || '';
 				}
 			});
-
 			return mappings;
 		},
 
@@ -92,52 +78,42 @@
 		 * Private helpers
 		 * ---------------------------------------------------------------- */
 
-		/**
-		 * Build a single mapping <tr>.
-		 *
-		 * @param  {string} pdfField   - PDF AcroForm field name (plain string).
-		 * @param  {string} savedValue - Previously saved GF field id, or ''.
-		 * @returns {jQuery}
-		 */
-		_buildRow: function (pdfField, savedValue) {
-			// Sanitise the name into a safe HTML id attribute
-			const selectId = 'gffpdf-map-' + pdfField.replace(/[^a-zA-Z0-9]/g, '_');
+		_buildRow: function (index, item, savedValue) {
+			// Index-based id: two PDF names that differ only by punctuation
+			// ("a.b" / "a_b") can no longer collide.
+			const selectId = 'gffpdf-map-' + index;
 
-			const $select = $('<select>', {
-				id: selectId,
-				class: 'gffpdf-gf-field-select',
-			});
-
+			const $select = $('<select>', { id: selectId, class: 'gffpdf-gf-field-select' });
 			$select.append($('<option>', { value: '', text: '— Do not map —' }));
 
 			$.each(this.gfFields, function (i, field) {
 				const $opt = $('<option>', {
 					value: String(field.id),
-					text: field.label + ' (field ' + field.id + ')',
+					text:  field.label + ' (field ' + field.id + ')',
 				});
-
 				if (String(field.id) === savedValue) {
 					$opt.prop('selected', true);
 				}
-
 				$select.append($opt);
 			});
 
-			const $row = $('<tr>', { 'data-pdf-field': pdfField });
+			// A saved mapping to a GF field that no longer exists: keep it visible
+			// instead of silently dropping it on the next save.
+			if (savedValue && !$select.find('option').filter(function () { return this.value === savedValue; }).length) {
+				$select.append($('<option>', { value: savedValue, text: savedValue + ' (field not found)', selected: true }));
+			}
+
+			const $row = $('<tr>').attr('data-pdf-field', item.name);
+
+			const $name = $('<td>').append($('<code>', { text: item.name }));
+			if (item.type && item.type !== 'text') {
+				$name.append(' ', $('<span>', { class: 'gffpdf-badge gffpdf-badge--gray', text: item.type }));
+			}
+			$row.append($name);
 
 			$row.append(
 				$('<td>').append(
-					$('<code>', { text: pdfField })
-				)
-			);
-
-			$row.append(
-				$('<td>').append(
-					$('<label>', {
-						for: selectId,
-						class: 'screen-reader-text',
-						text: 'GF field for ' + pdfField,
-					}),
+					$('<label>', { for: selectId, class: 'screen-reader-text', text: 'GF field for ' + item.name }),
 					$select
 				)
 			);
@@ -145,17 +121,13 @@
 			return $row;
 		},
 
-		/**
-		 * Wire up the ⚡ Auto-Map button.
-		 * Uses .off() first so re-opening the modal doesn't stack listeners.
-		 */
 		_bindAutoMap: function () {
 			const $btn = $('#gffpdf-auto-map');
 
 			$btn.off('click.gffpdf').on('click.gffpdf', function () {
 				const pdfFields = [];
 				$('#gffpdf-mapping-rows tr').each(function () {
-					pdfFields.push($(this).data('pdf-field'));
+					pdfFields.push($(this).attr('data-pdf-field'));
 				});
 
 				if (!pdfFields.length) return;
@@ -163,19 +135,24 @@
 				$btn.prop('disabled', true).text('Mapping…');
 
 				$.post(GFFPDF.ajax_url, {
-					action: 'gffpdf_auto_map',
-					nonce: GFFPDF.nonce,
-					form_id: GFFPDF.form_id,
+					action:     'gffpdf_auto_map',
+					nonce:      GFFPDF.nonce,
+					form_id:    GFFPDF.form_id,
 					pdf_fields: pdfFields,
 				})
 					.done(function (res) {
-						if (!res.success) return;
+						if (!res || !res.success) return;
 
 						// res.data = { pdfFieldName: gfFieldId }
 						$.each(res.data, function (pdfField, gfFieldId) {
-							const safeName = pdfField.replace(/[^a-zA-Z0-9]/g, '_');
-							$('#gffpdf-map-' + safeName).val(String(gfFieldId));
+							if (!gfFieldId) return; // never overwrite a row with "nothing"
+							$('#gffpdf-mapping-rows tr').filter(function () {
+								return $(this).attr('data-pdf-field') === pdfField;
+							}).find('.gffpdf-gf-field-select').val(String(gfFieldId));
 						});
+					})
+					.fail(function () {
+						window.alert(GFFPDF.strings.error);
 					})
 					.always(function () {
 						$btn.prop('disabled', false).text('⚡ Auto Map');
@@ -183,16 +160,9 @@
 			});
 		},
 
-		/**
-		 * Read GF fields from the <script type="application/json"> island
-		 * that the PHP feed-settings template prints as #gffpdf-gf-fields.
-		 *
-		 * @returns {Array<{id: string|number, label: string, type: string}>}
-		 */
 		_loadGFFields: function () {
 			const $el = $('#gffpdf-gf-fields');
 			if (!$el.length) return [];
-
 			try {
 				return JSON.parse($el.text()) || [];
 			} catch (e) {

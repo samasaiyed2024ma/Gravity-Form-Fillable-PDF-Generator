@@ -239,7 +239,8 @@ class GFFPDF_File_Handler {
 		// forever once their file has been removed.
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Batch maintenance query, not user-facing.
 		$old_rows = $wpdb->get_results( $wpdb->prepare(
-			"SELECT id, pdf_path FROM {$table} WHERE generated_at < %s AND pdf_path != ''",
+			"SELECT id, pdf_path FROM %i WHERE generated_at < %s AND pdf_path != ''",
+			$table,
 			$cutoff
 		) );
 
@@ -255,6 +256,7 @@ class GFFPDF_File_Handler {
 			// Clear the path rather than deleting the row: keeps the entry's
 			// "PDF generated on <date>" history intact and lets the existing
 			// "File missing" UI + Regenerate button do their job.
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 			$wpdb->update( $table, [ 'pdf_path' => '' ], [ 'id' => $row->id ], [ '%s' ], [ '%d' ] );
 			$deleted++;
 		}

@@ -3,7 +3,7 @@
  * Plugin Name: GF PDF Generator
  * Description: Generate PDFs automatically on Gravity Forms submission. Upload AcroForm PDFs, map fields, and produce filled PDFs on every entry.
  * Version: 1.0.0
- * Require at least: 5.8
+ * Require at least: 6.2
  * Require PHP: 7.4
  * Author: Mervan Agency
  * Author URI: https://mervanagency.io
@@ -24,7 +24,7 @@ define('GFFPDF_URL', plugin_dir_url(__FILE__));
 define('GFFPDF_UPLOAD_DIR', WP_CONTENT_DIR . '/uploads/gffpdf/');
 define('GFFPDF_UPLOAD_URL', content_url('/uploads/gffpdf'));
 define('GFFPDF_MIN_PHP', '7.4');
-define('GFFPDF_MIN_WP', '5.8');
+define('GFFPDF_MIN_WP', '6.2');
 
 // Composer autoload
 if(file_exists(GFFPDF_PATH . 'vendor/autoload.php')){
@@ -74,6 +74,9 @@ function gffpdf_init(){
 	require_once GFFPDF_PATH . 'includes/class-security.php';
 	require_once GFFPDF_PATH . 'includes/class-file-handler.php';
 	require_once GFFPDF_PATH . 'includes/class-font-manager.php';
+	require_once GFFPDF_PATH . 'includes/class-pdf-document.php';
+	require_once GFFPDF_PATH . 'includes/class-acroform-filler.php';
+	require_once GFFPDF_PATH . 'includes/class-xfa-filler.php';
 	require_once GFFPDF_PATH . 'includes/class-pdf-field-extractor.php';
 	require_once GFFPDF_PATH . 'includes/class-pdf-generator.php';
 	require_once GFFPDF_PATH . 'includes/class-template-handler.php';

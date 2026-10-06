@@ -25,14 +25,18 @@ class GFFPDF_PDF_Field_Extractor {
 			return new WP_Error( 'file_not_found', esc_html__( 'PDF file not found.', 'gf-fillable-pdf-generator' ) );
 		}
 
-		$fields = $this->parse_fields_from_pdf( $pdf_path );
+		try {
+			$fields = $this->parse_fields_from_pdf( $pdf_path );
+		} catch ( \RuntimeException $e ) {
+			return new WP_Error( 'pdf_unusable', $e->getMessage() );
+		}
 
 		if ( is_wp_error( $fields ) ) {
 			return $fields;
 		}
 
 		if ( empty( $fields ) ) {
-			return new WP_Error( 'no_fields', esc_html__( 'No fillable AcroForm fields found in this PDF.', 'gf-fillable-pdf-generator' ) );
+			return new WP_Error( 'no_fields', esc_html__( 'No fillable form fields were found in this PDF. It must contain AcroForm fields or an XFA form.', 'gf-fillable-pdf-generator' ) );
 		}
 
 		// Persist to DB (replace any previous extraction for this template)
@@ -52,6 +56,7 @@ class GFFPDF_PDF_Field_Extractor {
 	public function get_fields_for_template( string $pdf_path ): array {
 		global $wpdb;
 
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Custom table query for PDF template field mappings.		
 		$rows = $wpdb->get_results( $wpdb->prepare(
 			"SELECT * FROM {$wpdb->prefix}gffpdf_pdf_fields WHERE template_path = %s ORDER BY page_number ASC, id ASC",
 			$pdf_path
@@ -68,6 +73,7 @@ class GFFPDF_PDF_Field_Extractor {
 		}
 
 		// Re-fetch from DB after storing
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Custom table re-fetch post insertion.
 		return $wpdb->get_results( $wpdb->prepare(
 			"SELECT * FROM {$wpdb->prefix}gffpdf_pdf_fields WHERE template_path = %s ORDER BY page_number ASC, id ASC",
 			$pdf_path
@@ -78,7 +84,40 @@ class GFFPDF_PDF_Field_Extractor {
 	 * Core parser — uses smalot/pdfparser to handle compressed ObjStm PDFs
 	 * -------------------------------------------------------------------- */
 
+	/**
+	 * Read the fillable fields of a PDF with whichever engine fits it:
+	 * AcroForm first (incl. rebuilt forms and encrypted-with-empty-password
+	 * files), then XFA for forms that have no AcroForm fields.
+	 *
+	 * @throws RuntimeException
+	 */
+	public static function probe( string $bytes ): array {
+		try {
+			return GFFPDF_AcroForm_Filler::list_fields( $bytes );
+		} catch ( GFFPDF_XFA_Only_Exception $e ) {
+			return GFFPDF_XFA_Filler::list_fields( $bytes );
+		}
+	}
+
 	private function parse_fields_from_pdf( string $pdf_path ): array {
+		// Primary: the plugin's own parser — the same one that fills the form, so the
+		// field names offered in the mapping UI are exactly the ones that get filled.
+		// It also finds radio groups and fields nested under parent names.
+		try {
+			$bytes = file_get_contents( $pdf_path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- local file
+			if ( $bytes !== false && $bytes !== '' ) {
+				$rows = self::probe( $bytes );
+				if ( ! empty( $rows ) ) {
+					return $rows;
+				}
+			}
+		} catch ( \RuntimeException $e ) {
+			if ( stripos( $e->getMessage(), 'password' ) !== false || stripos( $e->getMessage(), 'encrypt' ) !== false ) {
+				throw $e; // can't be filled at all — tell the admin instead of guessing
+			}
+			GFFPDF_Logger::warn( 'Built-in field parser failed, falling back', [ 'error' => $e->getMessage() ] );
+		}
+
 		if ( ! class_exists( '\Smalot\PdfParser\Parser' ) ) {
 			return $this->parse_fields_via_regex( $pdf_path );
 		}
@@ -236,9 +275,11 @@ class GFFPDF_PDF_Field_Extractor {
 		global $wpdb;
 
 		// Delete old records for this template
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Custom table deletion.
 		$wpdb->delete( $wpdb->prefix . 'gffpdf_pdf_fields', [ 'template_path' => $pdf_path ], [ '%s' ] );
 
 		foreach ( $fields as $field ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Custom table insertion.
 			$wpdb->insert(
 				$wpdb->prefix . 'gffpdf_pdf_fields',
 				[

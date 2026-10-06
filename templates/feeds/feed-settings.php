@@ -80,7 +80,7 @@
 								<?php esc_html_e( 'Upload PDF', 'gf-fillable-pdf-generator' ); ?>
 							</button>
 							<span id="gffpdf-upload-status" class="gffpdf-upload-status"></span>
-							<p class="description" style="margin:0;"><?php esc_html_e( 'Only fillable AcroForm PDFs are supported.', 'gf-fillable-pdf-generator' ); ?></p>
+							<p class="description" style="margin:0;"><?php esc_html_e( 'Any fillable PDF works: standard (AcroForm) forms, XFA forms, and forms locked against editing (no password needed to open).', 'gf-fillable-pdf-generator' ); ?></p>
 						</div>
 						<input type="hidden" id="gffpdf-template-path">
 					</div>
@@ -103,25 +103,25 @@
 				</div>
 				<div class="gffpdf-section-body">
 					<div id="gffpdf-notifications-list" class="gffpdf-notifications-list">
-						<?php if ( empty( $notifications ) ) : ?>
+						<?php if ( empty( $gffpdf_notifications ) ) : ?>
 							<p class="description"><?php esc_html_e( 'No notifications found for this form.', 'gf-fillable-pdf-generator' ); ?></p>
 						<?php else : ?>
 							<?php 
 							// Load saved notification IDs and ensure all array values are cast to strings
-							$saved_notifications = isset( $feed['settings']['notifications'] ) 
+							$gffpdf_saved_notifications = isset( $feed['settings']['notifications'] ) 
 								? (array) $feed['settings']['notifications'] 
 								: ( isset( $feed['meta']['notifications'] ) ? (array) $feed['meta']['notifications'] : array() );
 							
-							$saved_notifications = array_map( 'strval', $saved_notifications );
+							$gffpdf_saved_notifications = array_map( 'strval', $gffpdf_saved_notifications );
 							?>
-							<?php foreach ( $notifications as $notif ) : ?>
+							<?php foreach ( $gffpdf_notifications as $gffpdf_notif ) : ?>
 								<label class="gffpdf-notification-item">
 									<input type="checkbox" 
 										name="gffpdf_notifications[]" 
 										class="gffpdf-notification-cb" 
-										value="<?php echo esc_attr( $notif['id'] ); ?>" 
-										<?php checked( in_array( (string) $notif['id'], $saved_notifications, true ) ); ?>>
-									<?php echo esc_html( $notif['name'] ); ?>
+										value="<?php echo esc_attr( $gffpdf_notif['id'] ); ?>" 
+										<?php checked( in_array( (string) $gffpdf_notif['id'], $gffpdf_saved_notifications, true ) ); ?>>
+									<?php echo esc_html( $gffpdf_notif['name'] ); ?>
 								</label>
 							<?php endforeach; ?>
 						<?php endif; ?>
@@ -143,8 +143,8 @@
 							<label for="gffpdf-font-family"><?php esc_html_e( 'Font Family', 'gf-fillable-pdf-generator' ); ?></label>
 							<select id="gffpdf-font-family" name="font_family">
 								<option value=""><?php esc_html_e( '— Use global setting —', 'gf-fillable-pdf-generator' ); ?></option>
-								<?php foreach ( $all_fonts as $fval => $flabel ) : ?>
-									<option value="<?php echo esc_attr( $fval ); ?>"><?php echo esc_html( $flabel ); ?></option>
+								<?php foreach ( $gffpdf_all_fonts as $gffpdf_fval => $gffpdf_flabel ) : ?>
+									<option value="<?php echo esc_attr( $gffpdf_fval ); ?>"><?php echo esc_html( $gffpdf_flabel ); ?></option>
 								<?php endforeach; ?>
 							</select>
 						</div>
@@ -170,7 +170,7 @@
 								<input type="checkbox" id="gffpdf-reverse-text">
 								<span class="gffpdf-toggle-slider"></span>
 							</label>
-							<p class="description"><?php esc_html_e( 'Reverses each field value before writing to PDF (RTL use).', 'gf-fillable-pdf-generator' ); ?></p>
+							<p class="description"><?php esc_html_e( 'Draws right-to-left text (Arabic, Hebrew, Persian, Urdu, Pashto, Sindhi, Kurdish, Dhivehi, Syriac, Yiddish and other RTL languages) in the correct direction. Left-to-right text is not affected.', 'gf-fillable-pdf-generator' ); ?></p>
 						</div>
 
 					</div>

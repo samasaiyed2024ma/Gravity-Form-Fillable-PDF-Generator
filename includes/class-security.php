@@ -59,6 +59,7 @@ class GFFPDF_Security {
 	 * Verify nonce and capability for AJAX requests; dies on failure.
 	 */
 	public static function check_ajax( string $action = self::NONCE_AJAX ): void {
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Nonce is verified directly via self::verify_nonce().
 		$nonce = isset( $_POST['nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['nonce'] ) ) : '';
 		if ( ! self::verify_nonce( $nonce, $action ) ) {
 			wp_send_json_error( [ 'message' => esc_html__( 'Security check failed.', 'gf-fillable-pdf-generator' ) ], 403 );
@@ -190,12 +191,20 @@ class GFFPDF_Security {
 			return new WP_Error( 'invalid_extension', esc_html__( 'Only PDF files are allowed.', 'gf-fillable-pdf-generator' ) );
 		}
 
-		// MIME
-		$finfo    = finfo_open( FILEINFO_MIME_TYPE );
-		$mime     = finfo_file( $finfo, $file['tmp_name'] );
-		finfo_close( $finfo );
+		// MIME / content. Some valid PDFs (leading blank lines or a BOM before the
+		// header, odd producers) are reported by finfo as text/octet-stream, so
+		// the real test is the %PDF- marker within the first KB, as the PDF spec
+		// and every viewer allow.
+		$finfo = finfo_open( FILEINFO_MIME_TYPE );
+		$mime  = $finfo ? finfo_file( $finfo, $file['tmp_name'] ) : '';
+		if ( $finfo ) finfo_close( $finfo );
 
-		if ( $mime !== 'application/pdf' ) {
+		$head = '';
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- uploaded temp file
+		$fh = @fopen( $file['tmp_name'], 'rb' );
+		if ( $fh ) { $head = (string) fread( $fh, 1024 ); fclose( $fh ); }
+
+		if ( $mime !== 'application/pdf' && strpos( $head, '%PDF-' ) === false ) {
 			return new WP_Error( 'invalid_mime', esc_html__( 'Invalid file type. Only PDF files are accepted.', 'gf-fillable-pdf-generator' ) );
 		}
 
