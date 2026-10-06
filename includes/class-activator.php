@@ -64,7 +64,6 @@ class GFFPDF_Activator {
 		) $charset_collate;";
 
 		// PDF template fields table — stores field name, type, rect, page per template
-		// This is the key new table: coordinates are extracted once on upload and reused at fill time.
 		$sql_pdf_fields = "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}gffpdf_pdf_fields (
 			id bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT,
 			template_path text NOT NULL,

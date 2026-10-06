@@ -19,17 +19,11 @@ class GFFPDF_Helpers {
 			$pattern
 		);
 
-		// {field:N} replacements
-		// $filename = preg_replace_callback( '/\{field:(\d+)\}/', function( $m ) use ( $entry ) {
-		// 	$val = isset( $entry[ $m[1] ] ) ? $entry[ $m[1] ] : '';
-		// 	return sanitize_file_name( $val );
-		// }, $filename );
-
 		// Update \d+ to [\d.]+ to support sub-field IDs like 1.3 or 1.6
-$filename = preg_replace_callback( '/\{field:([\d.]+)\}/', function( $m ) use ( $entry ) {
-    $val = isset( $entry[ $m[1] ] ) ? $entry[ $m[1] ] : '';
-    return sanitize_file_name( $val );
-}, $filename );
+		$filename = preg_replace_callback( '/\{field:([\d.]+)\}/', function( $m ) use ( $entry ) {
+			$val = isset( $entry[ $m[1] ] ) ? $entry[ $m[1] ] : '';
+			return sanitize_file_name( $val );
+		}, $filename );
 
 		// Sanitise the result
 		$filename = sanitize_file_name( $filename );

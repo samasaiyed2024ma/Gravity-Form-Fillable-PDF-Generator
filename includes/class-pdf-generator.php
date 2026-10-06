@@ -46,6 +46,8 @@ class GFFPDF_PDF_Generator {
 			'default_font_family' => $global['default_font_family'] ?? '',
 			'default_font_size'   => $global['default_font_size']   ?? '',
 			'default_font_color'  => $global['default_font_color']  ?? '',
+			// Choice labels / positions per PDF field, used to match radio & checkbox states
+			'value_aliases'       => ( isset( $options['value_aliases'] ) && is_array( $options['value_aliases'] ) ) ? $options['value_aliases'] : [],
 		];
 
 		$values = $this->normalise_values( $field_values );

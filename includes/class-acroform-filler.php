@@ -49,6 +49,9 @@ class GFFPDF_AcroForm_Filler {
 	private $image_cache = [];
 	private $font_counter = 0;
 	private $log = [];
+	/** @var array pdf_field => [ texts, index, count ] from the entry handler. */
+	private $aliases = [];
+	private $cur_alias = null;
 
 	/* =======================================================================
 	 * Public API
@@ -60,6 +63,7 @@ class GFFPDF_AcroForm_Filler {
 	 * @return array[] rows: field_name, field_type, page_number, rect_x1..y2, page_width, page_height
 	 * @throws RuntimeException when the file cannot be parsed or has no form.
 	 */
+
 	public static function list_fields( string $pdf_bytes ): array {
 		$f = new self();
 		$f->load( $pdf_bytes );
@@ -122,6 +126,7 @@ class GFFPDF_AcroForm_Filler {
 		$this->options = $options;
 		// RTL handling: true/false = the feed/global "RTL" toggle; null (option absent) = auto-detect.
 		$this->rtl_mode = array_key_exists( 'rtl', $options ) && $options['rtl'] !== null ? (bool) $options['rtl'] : null;
+		$this->aliases = ( isset( $options['value_aliases'] ) && is_array( $options['value_aliases'] ) ) ? $options['value_aliases'] : [];
 		$this->load( $pdf_bytes );
 
 		$by_fqn = [];
@@ -137,6 +142,7 @@ class GFFPDF_AcroForm_Filler {
 			$value = is_scalar( $value ) ? (string) $value : '';
 			if ( $value === '' ) continue;
 
+			$this->cur_alias = $this->aliases[ $name ] ?? null;
 			$targets = $by_fqn[ $name ] ?? ( $by_partial[ $name ] ?? [] );
 			if ( ! $targets ) {
 				$this->note( "No PDF field named '$name' in the template." );
@@ -727,39 +733,111 @@ class GFFPDF_AcroForm_Filler {
 	private function fill_button( array $f, string $value ): bool {
 		if ( $f['ff'] & self::FF_PUSHBUTTON ) return false;
 
-		$radio = (bool) ( $f['ff'] & self::FF_RADIO );
-		$v     = trim( $value );
-		$lv    = strtolower( $v );
-		$truthy = in_array( $lv, [ 'yes', '1', 'on', 'true', 'checked', 'x', 'y' ], true );
+		$radio   = (bool) ( $f['ff'] & self::FF_RADIO );
+		$widgets = $f['widgets'];
+		$count   = count( $widgets );
+		$v       = trim( $value );
+		$truthy  = in_array( strtolower( $v ), [ 'yes', '1', 'on', 'true', 'checked', 'x', 'y', 'selected' ], true );
+		$alias   = is_array( $this->cur_alias ) ? $this->cur_alias : [];
 
+		$norm = static function ( $x ) {
+			return preg_replace( '/[^\p{L}\p{N}]+/u', '', mb_strtolower( (string) $x, 'UTF-8' ) );
+		};
+
+		// Everything the submitted choice could be called: the value itself, the GF choice
+		// label/value, and the same without a "|price" suffix.
+		$cands = [ $v ];
+		foreach ( (array) ( $alias['texts'] ?? [] ) as $t ) {
+			$t = trim( (string) $t );
+			if ( $t !== '' ) $cands[] = $t;
+		}
+		foreach ( $cands as $c ) {
+			$s = preg_replace( '/\|[\d.,\-]+$/', '', $c );
+			if ( $s !== $c && $s !== '' ) $cands[] = $s;
+		}
+		$cands = array_values( array_unique( $cands ) );
+
+		// The template's "on" name of each widget (e.g. Choice1, Yes, 0, 1 ...).
 		$states = [];
-		foreach ( $f['widgets'] as $i => $w ) $states[ $i ] = $this->on_state( $w );
+		foreach ( $widgets as $i => $w ) $states[ $i ] = $this->on_state( $w );
+
+		// Human-readable option labels (/Opt), one per widget, when the template has them.
+		$labels = [];
+		if ( $f['opt'] && count( $f['opt']->a ) === $count ) {
+			foreach ( $f['opt']->a as $i => $o ) {
+				$o = $this->doc->resolve( $o );
+				$labels[ $i ] = $this->text_of( $o instanceof GFFPDF_Pdf_Arr && $o->a ? $this->doc->resolve( end( $o->a ) ) : $o );
+			}
+		}
 
 		$on = null;
-		foreach ( $states as $i => $s ) {
-			if ( $s !== null && strcasecmp( $s, $v ) === 0 ) { $on = $i; break; }
-		}
-		if ( $on === null && ! $radio && $truthy ) $on = 0;
 
+		// 1. Exact (case-insensitive) match on the widget's on-state name.
+		foreach ( $cands as $c ) {
+			foreach ( $states as $i => $s ) {
+				if ( $s !== null && strcasecmp( (string) $s, $c ) === 0 ) { $on = $i; break 2; }
+			}
+		}
+		// 2. Same, ignoring spaces and punctuation ("Choice 1" = "choice1").
+		if ( $on === null ) {
+			foreach ( $cands as $c ) {
+				$nc = $norm( $c );
+				if ( $nc === '' ) continue;
+				foreach ( $states as $i => $s ) {
+					if ( $s !== null && $norm( $s ) === $nc ) { $on = $i; break 2; }
+				}
+			}
+		}
+		// 3. Match the option labels stored in /Opt.
+		if ( $on === null && $labels ) {
+			foreach ( $cands as $c ) {
+				$nc = $norm( $c );
+				if ( $nc === '' ) continue;
+				foreach ( $labels as $i => $l ) {
+					if ( $norm( $l ) === $nc ) { $on = $i; break 2; }
+				}
+			}
+		}
+		// 4. Plain on/off: a checkbox, or a radio that has a single widget, ticked by yes/true/1/on.
+		if ( $on === null && $truthy && ( ! $radio || $count === 1 ) ) {
+			$on = 0;
+		}
+		// 5. Last resort for a radio group: same position, but only when the PDF group and the
+		//    GF field have exactly the same number of options.
+		if ( $on === null && $radio && $count > 1 && isset( $alias['index'], $alias['count'] )
+			&& (int) $alias['count'] === $count && $alias['index'] >= 0 && $alias['index'] < $count ) {
+			$on = (int) $alias['index'];
+			$this->note( "Radio '{$f['fqn']}': no option name matched '$v'; used option position " . ( $on + 1 ) . ' instead.' );
+		}
+
+		if ( $on === null ) {
+			$shown = [];
+			foreach ( $states as $s ) $shown[] = $s === null ? '(none)' : (string) $s;
+			$this->note( "Button '{$f['fqn']}': value '$v' matches none of its options [" . implode( ', ', $shown )
+				. ( $labels ? ' | labels: ' . implode( ', ', $labels ) : '' )
+				. ']. Rename the PDF export values to match the form choices.' );
+		}
+
+		// A widget with no "on" appearance in the template gets one generated.
 		$needs_ap = false;
 		if ( $on !== null && $states[ $on ] === null ) {
-			$states[ $on ] = 'Yes'; // template has no "on" appearance for this widget — we create one
+			$states[ $on ] = ( $radio && $count > 1 ) ? (string) $on : 'Yes';
 			$needs_ap      = true;
 		}
 
 		$fd = &$this->work( $f['num'], $f['dict'] );
-		$fd->set( 'V', new GFFPDF_Pdf_Name( $on !== null ? $states[ $on ] : 'Off' ) );
+		$fd->set( 'V', new GFFPDF_Pdf_Name( $on !== null ? (string) $states[ $on ] : 'Off' ) );
 
-		foreach ( $f['widgets'] as $i => $w ) {
+		foreach ( $widgets as $i => $w ) {
 			$wd = &$this->work( $w['num'], $w['dict'] );
 			if ( $i === $on ) {
-				if ( $needs_ap ) $this->make_check_ap( $wd, $w, $radio );
-				$wd->set( 'AS', new GFFPDF_Pdf_Name( $states[ $i ] ) );
+				if ( $needs_ap ) $this->make_check_ap( $wd, $w, $radio, (string) $states[ $i ] );
+				$wd->set( 'AS', new GFFPDF_Pdf_Name( (string) $states[ $i ] ) );
 			} else {
 				$wd->set( 'AS', new GFFPDF_Pdf_Name( 'Off' ) );
 			}
 		}
-		return true;
+		return $on !== null;
 	}
 
 	private function on_state( array $w ): ?string {
@@ -773,7 +851,7 @@ class GFFPDF_AcroForm_Filler {
 		return null;
 	}
 
-	private function make_check_ap( GFFPDF_Pdf_Dict $wd, array $w, bool $radio ): void {
+	private function make_check_ap( GFFPDF_Pdf_Dict $wd, array $w, bool $radio, string $state = 'Yes' ): void {
 		$g = $this->widget_geometry( $w );
 		if ( ! $g ) return;
 		$font = $this->doc->add( new GFFPDF_Pdf_Dict( [
@@ -789,7 +867,7 @@ class GFFPDF_AcroForm_Filler {
 		$res   = new GFFPDF_Pdf_Dict( [ 'Font' => new GFFPDF_Pdf_Dict( [ 'ZaDb' => $font ] ) ] );
 		$wd->set( 'AP', new GFFPDF_Pdf_Dict( [
 			'N' => new GFFPDF_Pdf_Dict( [
-				'Yes' => $this->form_xobject( $g, $on, $res ),
+				$state => $this->form_xobject( $g, $on, $res ),
 				'Off' => $this->form_xobject( $g, $g['chrome'], new GFFPDF_Pdf_Dict() ),
 			] ),
 		] ) );

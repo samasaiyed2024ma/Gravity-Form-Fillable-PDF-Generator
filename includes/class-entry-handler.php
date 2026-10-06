@@ -25,6 +25,9 @@ class GFFPDF_Entry_Handler {
 	/** Temp attachment-only files created during this request, cleaned up on shutdown. */
 	private static array $temp_files = [];
 
+	/** pdf_field => [ texts, index, count ] describing the submitted GF choice (see choice_aliases()). */
+	private array $value_aliases = [];
+
 	public function __construct() {
 		add_action( 'gform_after_submission', [ $this, 'generate_pdf' ], 10, 2 );
 		add_action( 'wp_ajax_gffpdf_regenerate', [ $this, 'ajax_regenerate' ] );
@@ -222,6 +225,8 @@ class GFFPDF_Entry_Handler {
 		// affected no matter which of these is enabled.
 		$settings['reverse_text'] = ! empty( $settings['reverse_text'] ) || ! empty( $global_settings['rtl_support'] );
 
+		$settings['value_aliases'] = $this->value_aliases;
+
 		$generator = new GFFPDF_PDF_Generator();
 		$pdf_bytes = $generator->generate( $template_path, $field_values, $settings );
 
@@ -336,6 +341,7 @@ class GFFPDF_Entry_Handler {
 	 */
 	private function build_field_values( array $mappings, array $entry, array $form ): array {
 		$values = [];
+		$this->value_aliases = [];
 
 		$field_objects = [];
 		if ( ! empty( $form['fields'] ) ) {
@@ -372,7 +378,15 @@ class GFFPDF_Entry_Handler {
 					}
 				}
 
-				$values[ $pdf_field ] = ( (string) $submitted_val === (string) $target_choice ) ? 'Yes' : '';
+				$is_on = ( (string) $submitted_val === (string) $target_choice );
+				$values[ $pdf_field ] = $is_on ? 'Yes' : '';
+				if ( $is_on ) {
+					// Lets a multi-option PDF radio group find the right option even though the value is "Yes".
+					$alias = $this->choice_aliases( $field_objects[ $real_id ] ?? null, (string) $target_choice );
+					if ( $alias ) {
+						$this->value_aliases[ $pdf_field ] = $alias;
+					}
+				}
 				continue;
 			}
 
@@ -457,9 +471,43 @@ class GFFPDF_Entry_Handler {
 				default:
 					$values[ $pdf_field ] = (string) $raw_value;
 			}
+
+			// Radio / dropdown / checkbox: remember the choice's label and position so the
+			// PDF filler can match the template's own option names (they rarely equal the GF value).
+			if ( $field_obj && in_array( $field_type, [ 'radio', 'select', 'checkbox' ], true ) && ! empty( $values[ $pdf_field ] ) ) {
+				$alias = $this->choice_aliases( $field_obj, (string) $raw_value );
+				if ( $alias ) {
+					$this->value_aliases[ $pdf_field ] = $alias;
+				}
+			}
 		}
 
 		return $values;
+	}
+
+	/**
+	 * Describe the GF choice that was submitted: its label and value, its position and
+	 * how many choices the field has.
+	 *
+	 * @return array{texts:string[],index:int,count:int}|null
+	 */
+	private function choice_aliases( $field, string $raw ): ?array {
+		if ( ! $field || empty( $field->choices ) || ! is_array( $field->choices ) || $raw === '' ) {
+			return null;
+		}
+		$needle = preg_replace( '/\|[\d.,\-]+$/', '', $raw ); // drop "|price" suffix
+		foreach ( array_values( $field->choices ) as $idx => $c ) {
+			$val = (string) ( $c['value'] ?? '' );
+			$txt = (string) ( $c['text'] ?? '' );
+			if ( $raw === $val || $raw === $txt || $needle === $val || $needle === $txt ) {
+				return [
+					'texts' => array_values( array_filter( array_unique( [ $txt, $val ] ), 'strlen' ) ),
+					'index' => $idx,
+					'count' => count( $field->choices ),
+				];
+			}
+		}
+		return null;
 	}
 	/* -----------------------------------------------------------------------
 	 * Email attachment
