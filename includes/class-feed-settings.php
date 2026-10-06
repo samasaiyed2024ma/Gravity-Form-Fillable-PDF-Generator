@@ -321,7 +321,7 @@ class GFFPDF_Feed_Settings {
 					$feed->pdf_fields = $extractor->get_simple_fields_for_ui( $feed->template_path );
 				} catch ( \Throwable $e ) {
 					$feed->fields_error = $e->getMessage();
-					GFFPDF_Logger::warn( 'Could not read template fields while editing feed', [ 'feed_id' => $feed_id, 'error' => $e->getMessage() ] );
+					GFFPDF_Logger::warn( __('Could not read template fields while editing feed', 'gf-fillable-pdf-generator'), [ 'feed_id' => $feed_id, 'error' => $e->getMessage() ] );
 				}
 			} else {
 				$feed->template_missing = true;
@@ -499,7 +499,7 @@ class GFFPDF_Feed_Settings {
 		$result  = $handler->process_feed( $feed, $entry, $form );
 
 		if ( is_wp_error( $result ) ) {
-			GFFPDF_Logger::error( 'On-demand PDF regeneration failed for public download link', [
+			GFFPDF_Logger::error( __('On-demand PDF regeneration failed for public download link', 'gf-fillable-pdf-generator'), [
 				'pdf_id' => $record->id,
 				'reason' => $result->get_error_message(),
 			] );
@@ -669,7 +669,7 @@ class GFFPDF_Feed_Settings {
 			return new WP_Error( 'db_error', __( 'Could not save feed.', 'gf-fillable-pdf-generator' ) );
 		}
 
-		GFFPDF_Logger::info( 'Feed created', [ 'id' => $wpdb->insert_id, 'form_id' => $clean['form_id'] ] );
+		GFFPDF_Logger::info( __('Feed created', 'gf-fillable-pdf-generator'), [ 'id' => $wpdb->insert_id, 'form_id' => $clean['form_id'] ] );
 		return $wpdb->insert_id;
 	}
 
@@ -694,7 +694,7 @@ class GFFPDF_Feed_Settings {
 			[ '%d' ]
 		);
 
-		GFFPDF_Logger::info( 'Feed updated', [ 'id' => $feed_id ] );
+		GFFPDF_Logger::info( __('Feed updated', 'gf-fillable-pdf-generator'), [ 'id' => $feed_id ] );
 		return $updated !== false;
 	}
 
@@ -707,7 +707,7 @@ class GFFPDF_Feed_Settings {
 			[ 'id' => $feed_id ],
 			[ '%d' ]
 		);
-		GFFPDF_Logger::info( 'Feed deleted', [ 'id' => $feed_id ] );
+		GFFPDF_Logger::info( __('Feed deleted', 'gf-fillable-pdf-generator'), [ 'id' => $feed_id ] );
 		return $deleted !== false;
 	}
 
