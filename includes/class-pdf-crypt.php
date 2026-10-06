@@ -39,7 +39,7 @@ class GFFPDF_Pdf_Crypt {
 	public function __construct( GFFPDF_Pdf_Document $doc, GFFPDF_Pdf_Dict $enc, string $id0 ) {
 		$filter = $doc->name( $enc->get( 'Filter' ) );
 		if ( $filter !== '' && $filter !== 'Standard' ) {
-			throw new RuntimeException( 'This PDF uses an unsupported encryption handler (' . $filter . '), so its form fields cannot be filled.' );
+			throw new RuntimeException( 'This PDF uses an unsupported encryption handler (' . esc_html($filter) . '), so its form fields cannot be filled.' );
 		}
 
 		$this->v = (int) $doc->num( $enc->get( 'V' ), 0 );

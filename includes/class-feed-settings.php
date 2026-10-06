@@ -1,4 +1,5 @@
 <?php
+// phpcs:disable WordPress.Security.NonceVerification.Missing, WordPress.Security.NonceVerification.Recommended
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 /**

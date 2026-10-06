@@ -200,9 +200,14 @@ class GFFPDF_Security {
 		if ( $finfo ) finfo_close( $finfo );
 
 		$head = '';
-		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- uploaded temp file
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen -- Reading local uploaded temporary file.
 		$fh = @fopen( $file['tmp_name'], 'rb' );
-		if ( $fh ) { $head = (string) fread( $fh, 1024 ); fclose( $fh ); }
+		if ( $fh ) { 
+			// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fread -- Reading local uploaded temporary file.
+			$head = (string) fread( $fh, 1024 ); 
+			// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose -- Closing handle for local uploaded temporary file.
+			fclose( $fh ); 
+		}
 
 		if ( $mime !== 'application/pdf' && strpos( $head, '%PDF-' ) === false ) {
 			return new WP_Error( 'invalid_mime', esc_html__( 'Invalid file type. Only PDF files are accepted.', 'gf-fillable-pdf-generator' ) );
