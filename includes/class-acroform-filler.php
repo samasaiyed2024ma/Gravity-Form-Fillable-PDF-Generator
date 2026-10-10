@@ -187,7 +187,7 @@ class GFFPDF_AcroForm_Filler {
 	private function load( string $bytes ): void {
 		$this->doc = new GFFPDF_Pdf_Document( $bytes );
 		$cat = $this->doc->catalog();
-		if ( ! $cat ) throw new RuntimeException( __('PDF catalog not found.', 'gf-fillable-pdf-generator') );
+		if ( ! $cat ) throw new RuntimeException( esc_html__('PDF catalog not found.', 'gf-fillable-pdf-generator') );
 
 		$raw = $cat->get( 'AcroForm' );
 		$this->acro_num = $raw instanceof GFFPDF_Pdf_Ref ? $raw->num : null;
@@ -222,11 +222,11 @@ class GFFPDF_AcroForm_Filler {
 		}
 		if ( ! $roots ) {
 			if ( $this->has_xfa( $acro ) ) {
-				throw new GFFPDF_XFA_Only_Exception( __('This PDF is an XFA-only form (no AcroForm fields).', 'gf-fillable-pdf-generator') );
+				throw new GFFPDF_XFA_Only_Exception( esc_html__('This PDF is an XFA-only form (no AcroForm fields).', 'gf-fillable-pdf-generator') );
 			}
 			throw new RuntimeException( $raw === null
-				? __('This PDF has no fillable form fields — it is not a fillable form.', 'gf-fillable-pdf-generator')
-				: __('The PDF form contains no fields.', 'gf-fillable-pdf-generator') );
+				? esc_html__('This PDF has no fillable form fields — it is not a fillable form.', 'gf-fillable-pdf-generator')
+				: esc_html__('The PDF form contains no fields.', 'gf-fillable-pdf-generator') );
 		}
 		$this->field_roots = $roots;
 
@@ -235,7 +235,7 @@ class GFFPDF_AcroForm_Filler {
 			$this->walk_field( $ref, [], '', 0, $seen );
 		}
 		if ( ! $this->fields ) {
-			throw new RuntimeException( __('No fillable AcroForm fields found in this PDF.', 'gf-fillable-pdf-generator') );
+			throw new RuntimeException( esc_html__('No fillable AcroForm fields found in this PDF.', 'gf-fillable-pdf-generator') );
 		}
 	}
 

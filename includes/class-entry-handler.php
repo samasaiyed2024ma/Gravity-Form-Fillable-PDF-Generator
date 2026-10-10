@@ -239,7 +239,8 @@ class GFFPDF_Entry_Handler {
 			] );
 			return array_merge( $empty_result, [ 'error' => new WP_Error(
 				$pdf_bytes->get_error_code(),
-				sprintf( __('Feed "%s": %s', 'gf-fillable-pdf-generator'), $feed->feed_name, $pdf_bytes->get_error_message() )
+				// translators: 1: Feed name, 2: Error message.
+				sprintf( __( 'Feed "%1$s": %2$s', 'gf-fillable-pdf-generator' ), $feed->feed_name, $pdf_bytes->get_error_message() )			
 			) ] );
 		}
 
@@ -265,7 +266,8 @@ class GFFPDF_Entry_Handler {
 			GFFPDF_Logger::error( __('PDF save failed', 'gf-fillable-pdf-generator'), [ 'feed_id' => $feed_id, 'entry' => $entry['id'] ] );
 			return array_merge( $empty_result, [ 'error' => new WP_Error(
 				$path->get_error_code(),
-				sprintf( __('Feed "%s": %s', 'gf-fillable-pdf-generator'), $feed->feed_name, $path->get_error_message() )
+				// translators: 1: Feed name, 2: Error message.
+				sprintf( __( 'Feed "%1$s": %2$s', 'gf-fillable-pdf-generator' ), $feed->feed_name, $path->get_error_message() )			
 			) ] );
 		}
 

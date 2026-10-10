@@ -142,13 +142,13 @@ class GFFPDF_XFA_Filler {
 	private function load( string $bytes ): void {
 		$this->doc = new GFFPDF_Pdf_Document( $bytes );
 		$cat = $this->doc->catalog();
-		if ( ! $cat ) throw new RuntimeException( __('PDF catalog not found.', 'gf-fillable-pdf-generator') );
+		if ( ! $cat ) throw new RuntimeException( esc_html__('PDF catalog not found.', 'gf-fillable-pdf-generator') );
 
 		$raw = $cat->get( 'AcroForm' );
 		$this->acro_ref = $raw instanceof GFFPDF_Pdf_Ref ? $raw : null;
 		$this->acro     = $this->doc->dict( $raw );
 		if ( ! $this->acro || ! $this->acro->has( 'XFA' ) ) {
-			throw new RuntimeException( __('This PDF has no XFA form.', 'gf-fillable-pdf-generator') );
+			throw new RuntimeException( esc_html__('This PDF has no XFA form.', 'gf-fillable-pdf-generator') );
 		}
 
 		$this->xfa_raw = $this->acro->get( 'XFA' );
@@ -165,7 +165,7 @@ class GFFPDF_XFA_Filler {
 				$this->packets[ $n ] = [ 'ref' => $r instanceof GFFPDF_Pdf_Ref ? $r : null, 'xml' => $this->doc->decode_stream( $s ) ];
 			}
 			if ( empty( $this->packets['template'] ) ) {
-				throw new RuntimeException( __('The XFA form has no template packet.', 'gf-fillable-pdf-generator') );
+				throw new RuntimeException( esc_html__('The XFA form has no template packet.', 'gf-fillable-pdf-generator') );
 			}
 			$template_xml = $this->packets['template']['xml'];
 			$tdom = $this->dom( $template_xml );
@@ -179,9 +179,9 @@ class GFFPDF_XFA_Filler {
 			foreach ( $xdom->documentElement->childNodes as $c ) {
 				if ( $c instanceof DOMElement && $c->localName === 'template' ) { $troot = $c; break; }
 			}
-			if ( ! $troot ) throw new RuntimeException( __('The XFA form has no template packet.', 'gf-fillable-pdf-generator') );
+			if ( ! $troot ) throw new RuntimeException( esc_html__('The XFA form has no template packet.', 'gf-fillable-pdf-generator') );
 		} else {
-			throw new RuntimeException( __('The XFA entry of this PDF could not be read.', 'gf-fillable-pdf-generator') );
+			throw new RuntimeException( esc_html__('The XFA entry of this PDF could not be read.', 'gf-fillable-pdf-generator') );
 		}
 
 		$this->fields = [];
@@ -195,7 +195,7 @@ class GFFPDF_XFA_Filler {
 		$seen = [];
 		$this->walk( $troot, [], $seen );
 		if ( ! $this->fields ) {
-			throw new RuntimeException( __('No fillable fields found in the XFA form.', 'gf-fillable-pdf-generator') );
+			throw new RuntimeException( esc_html__('No fillable fields found in the XFA form.', 'gf-fillable-pdf-generator') );
 		}
 	}
 
@@ -207,7 +207,7 @@ class GFFPDF_XFA_Filler {
 		libxml_clear_errors();
 		libxml_use_internal_errors( $prev );
 		if ( ! $ok || ! $d->documentElement ) {
-			throw new RuntimeException( __('The XFA XML could not be parsed.', 'gf-fillable-pdf-generator') );
+			throw new RuntimeException( esc_html__('The XFA XML could not be parsed.', 'gf-fillable-pdf-generator') );
 		}
 		return $d;
 	}
@@ -368,7 +368,7 @@ class GFFPDF_XFA_Filler {
 
 		if ( $this->mode === 'single' ) {
 			$ref = $this->packets['xdp']['ref'];
-			if ( ! $ref ) throw new RuntimeException( __('XFA stream is not an indirect object.', 'gf-fillable-pdf-generator') );
+			if ( ! $ref ) throw new RuntimeException( esc_html__('XFA stream is not an indirect object.', 'gf-fillable-pdf-generator') );
 			$this->doc->put( $ref->num, $this->pack( $xml ) );
 		} else {
 			// The datasets packet is an element on its own — drop the XML declaration noise.
